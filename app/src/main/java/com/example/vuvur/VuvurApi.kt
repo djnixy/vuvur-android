@@ -1,39 +1,17 @@
 package com.example.vuvur
 
-import com.google.gson.annotations.SerializedName
+import com.example.vuvur.data.SettingsRepository
+import okhttp3.Interceptor
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Query
 
-/**
- * Data models to match the JSON response from our API.
- */
-data class MediaFile(
-    val path: String,
-    val type: String,
-    val width: Int,
-    val height: Int,
-    val mod_time: Double,
-    val exif: Map<String, Any>
-)
+// All data classes have been moved to DataModels.kt
 
-data class PaginatedFileResponse(
-    val total_items: Int,
-    val page: Int,
-    val total_pages: Int,
-    val items: List<MediaFile>
-)
-
-data class ScanStatusResponse(
-    val status: String,
-    val progress: Int,
-    val total: Int
-)
-
-/**
- * The Retrofit interface defining all our API endpoints.
- */
 interface VuvurApiService {
     @GET("/api/files")
     suspend fun getFiles(
@@ -48,19 +26,51 @@ interface VuvurApiService {
 
     @GET("/api/scan-status")
     suspend fun getScanStatus(): ScanStatusResponse
+
+    @GET("/api/files/random")
+    suspend fun getRandomFiles(@Query("count") count: Int): List<MediaFile>
+
+    @GET("/api/settings")
+    suspend fun getSettings(): SettingsResponse
+
+    @POST("/api/settings")
+    suspend fun saveSettings(@Body settings: AppSettings): AppSettings
+
+    @POST("/api/cache/cleanup")
+    suspend fun cleanCache(): CleanupResponse
 }
 
-/**
- * A singleton object to create and hold our Retrofit client.
- */
 object ApiClient {
-    // CHANGE THIS LINE: Replace the emulator IP with your PC's Wi-Fi IP
-    const val API_BASE_URL = "http://100.78.149.91:5001/"
+    private const val DUMMY_URL = "http://localhost/"
 
-    private val retrofit: Retrofit = Retrofit.Builder()
-        .baseUrl(API_BASE_URL)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
+    fun createService(repository: SettingsRepository): VuvurApiService {
 
-    val service: VuvurApiService = retrofit.create(VuvurApiService::class.java)
+        val interceptor = Interceptor { chain ->
+            var request = chain.request()
+            val activeUrlFull = repository.activeApiUrl
+            val activeHost = activeUrlFull.substringAfter("http://").substringBefore(":")
+            val activePort = activeUrlFull.substringAfterLast(":").removeSuffix("/").toInt()
+
+            val newUrl = request.url.newBuilder()
+                .host(activeHost)
+                .port(activePort)
+                .scheme("http")
+                .build()
+
+            request = request.newBuilder().url(newUrl).build()
+            chain.proceed(request)
+        }
+
+        val client = OkHttpClient.Builder()
+            .addInterceptor(interceptor)
+            .build()
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl(DUMMY_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+
+        return retrofit.create(VuvurApiService::class.java)
+    }
 }

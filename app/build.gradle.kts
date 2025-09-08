@@ -37,6 +37,10 @@ android {
     buildFeatures {
         compose = true
     }
+    buildTypes.all {
+        val buildType = this.name
+        setProperty("archivesBaseName", "vuvur-v${defaultConfig.versionName}-$buildType")
+    }
 }
 
 dependencies {
@@ -56,17 +60,21 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-    // ViewModel for state management
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")
 
-    // Navigation for moving between screens
-    implementation("androidx.navigation:navigation-compose:2.7.7")
 
-    // Networking (Retrofit for API calls, OkHttp as the engine)
+//    // Our Added Dependencies
+//    implementation(libs.androidx.compose.material.icons.extended.android)
+//    implementation(libs.retrofit)
+//    implementation(libs.converter.gson)
+//    implementation(libs.okhttp)
+//    implementation(libs.coil.compose)
+//    implementation(libs.androidx.lifecycle.viewmodel.compose)
+//    implementation(libs.androidx.navigation.compose)
+    implementation("androidx.compose.material:material-icons-extended-android:1.7.8")
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-
-    // Image Loading (Coil for Compose)
-    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.3")
+    implementation("androidx.navigation:navigation-compose:2.9.3")
 }

@@ -1,9 +1,15 @@
-package com.example.vuvur
+package com.example.vuvur.screens
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.vuvur.ApiClient
+import com.example.vuvur.GalleryUiState
+import com.example.vuvur.ScanStatusResponse
+import com.example.vuvur.VuvurApplication
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,23 +17,19 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
-sealed interface GalleryUiState {
-    data object Loading : GalleryUiState
-    data class Scanning(val progress: Int, val total: Int) : GalleryUiState
-    data class Error(val message: String) : GalleryUiState
-    data class Success(
-        val files: List<MediaFile> = emptyList(),
-        val totalPages: Int = 1,
-        val currentPage: Int = 1,
-        val isLoadingNextPage: Boolean = false
-    ) : GalleryUiState
-}
+class GalleryViewModel(application: Application) : AndroidViewModel(application) {
 
-class GalleryViewModel : ViewModel() {
-    private val api = ApiClient.service
+    private val repository = (application as VuvurApplication).settingsRepository
+    private val apiService = ApiClient.createService(repository)
 
     private val _uiState = MutableStateFlow<GalleryUiState>(GalleryUiState.Loading)
     val uiState = _uiState.asStateFlow()
+
+    private var pollingJob: Job? = null
+
+    private var currentSort = "random"
+    private var currentQuery = ""
+    private var currentExifQuery = ""
 
     init {
         loadPage(1)
@@ -45,25 +47,23 @@ class GalleryViewModel : ViewModel() {
             }
 
             try {
-                // Call the API
-                val response = api.getFiles(
-                    sortBy = "random",
-                    query = "",
-                    exifQuery = "",
+                val response = apiService.getFiles(
+                    sortBy = currentSort,
+                    query = currentQuery,
+                    exifQuery = currentExifQuery,
                     page = page
                 )
-                // We got data, update state to Success
                 _uiState.update {
                     val currentFiles = (it as? GalleryUiState.Success)?.files ?: emptyList()
                     GalleryUiState.Success(
                         files = if (isFirstPage) response.items else currentFiles + response.items,
                         totalPages = response.total_pages,
                         currentPage = response.page,
-                        isLoadingNextPage = false
+                        isLoadingNextPage = false,
+                        activeApiUrl = repository.activeApiUrl
                     )
                 }
             } catch (e: HttpException) {
-                // API call failed, check if it's because the backend is scanning
                 try {
                     val errorBody = e.response()?.errorBody()?.string() ?: ""
                     val scanStatus = Gson().fromJson(errorBody, ScanStatusResponse::class.java)
@@ -77,26 +77,27 @@ class GalleryViewModel : ViewModel() {
                     _uiState.value = GalleryUiState.Error(e.message())
                 }
             } catch (e: Exception) {
-                // Any other error (like network timeout)
                 _uiState.value = GalleryUiState.Error(e.message ?: "Unknown error")
             }
         }
     }
 
     private fun startPollingForScanStatus() {
-        viewModelScope.launch(Dispatchers.IO) {
+        if (pollingJob?.isActive == true) return
+
+        pollingJob = viewModelScope.launch(Dispatchers.IO) {
             while (true) {
-                delay(2000) // Poll every 2 seconds
+                delay(2000)
                 try {
-                    val status = api.getScanStatus()
+                    val status = apiService.getScanStatus()
                     if (status.status == "complete") {
-                        loadPage(1) // Scan is done! Load the gallery.
-                        break // Stop polling
+                        loadPage(1)
+                        break
                     } else {
                         _uiState.value = GalleryUiState.Scanning(status.progress, status.total)
                     }
                 } catch (e: Exception) {
-                    // Do nothing, just retry polling
+                    // continue polling
                 }
             }
         }
