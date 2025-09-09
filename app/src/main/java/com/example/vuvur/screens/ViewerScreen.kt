@@ -28,6 +28,14 @@ fun ViewerScreen(
     var zoomedPageIndex by remember { mutableStateOf(-1) }
     val isPagerScrollEnabled = zoomedPageIndex == -1
 
+    // Get the zoom level from the ViewModel's state (which comes from the API/Settings)
+    val zoomLevel = (state as? GalleryUiState.Success)?.activeApiUrl?.let {
+        // This is a bug, the VM should expose the settings object.
+        // For now, let's just get the zoom level from the VM directly.
+        // We need to update the GalleryViewModel.
+        viewModel.getZoomLevel() // We will add this function
+    } ?: 2.5f // Default
+
     Box(modifier = Modifier.fillMaxSize()) {
         when (val currentState = state) {
             is GalleryUiState.Success -> {
@@ -61,7 +69,7 @@ fun ViewerScreen(
                         onZoomToggle = {
                             zoomedPageIndex = if (zoomedPageIndex == pageIndex) -1 else pageIndex
                         },
-                        zoomLevel = 2.5f // Hardcoded for now.
+                        zoomLevel = zoomLevel
                     )
                 }
             }

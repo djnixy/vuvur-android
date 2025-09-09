@@ -58,7 +58,11 @@ fun RandomScreen(
             return
         }
 
-        val pagerState = rememberPagerState(pageCount = { files.size })
+        val pagerState = rememberPagerState(
+            initialPage = 0,
+            initialPageOffsetFraction = 0f,
+            pageCount = { files.size }
+        )
 
         LaunchedEffect(pagerState.isScrollInProgress) {
             if (pagerState.isScrollInProgress) {

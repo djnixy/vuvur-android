@@ -28,8 +28,11 @@ class SettingsRepository(context: Context) {
 
         // Your saved default URLs
         val DEFAULT_URLS = listOf(
+            "http://100.97.27.128:5001",
+            "http://100.97.27.128:5002",
             "http://100.78.149.91:5001",
             "http://100.78.149.91:5002"
+
         )
     }
 }
