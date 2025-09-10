@@ -55,9 +55,9 @@ fun SingleMediaScreen(
                         MediaSlide(
                             file = currentFile,
                             activeApiUrl = currentState.activeApiUrl,
-                            isZoomed = isZoomed,
-                            onZoomToggle = { isZoomed = !isZoomed },
-                            zoomLevel = zoomLevel
+                            onNextImage = { currentIndex++ },
+                            onPreviousImage = { currentIndex-- },
+                            allowSwipeNavigation = false // disables vertical swipe
                         )
 
                         // Floating "Next" button

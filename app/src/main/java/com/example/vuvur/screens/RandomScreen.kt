@@ -64,11 +64,9 @@ fun RandomScreen(
                     MediaSlide(
                         file = file,
                         activeApiUrl = currentState.activeApiUrl,
-                        isZoomed = (zoomedPageIndex == pageIndex),
-                        onZoomToggle = {
-                            zoomedPageIndex = if (zoomedPageIndex == pageIndex) -1 else pageIndex
-                        },
-                        zoomLevel = zoomLevel
+                        onNextImage = { /* go to next media */ },
+                        onPreviousImage = { /* go to previous media */ },
+                        allowSwipeNavigation = true // enables vertical swipe
                     )
                 }
             }
