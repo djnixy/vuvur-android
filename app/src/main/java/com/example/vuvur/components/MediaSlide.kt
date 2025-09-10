@@ -32,7 +32,7 @@ fun MediaSlide(
     activeApiUrl: String,
     isZoomed: Boolean,
     onZoomToggle: () -> Unit,
-    zoomLevel: Float = 2.5f
+    zoomLevel: Float
 ) {
     val verticalScrollState = rememberScrollState()
     val horizontalScrollState = rememberScrollState()
@@ -76,7 +76,7 @@ fun MediaSlide(
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data(imageUrl(file, activeApiUrl))
+                        .data("$activeApiUrl/api/preview/${file.path}")
                         .crossfade(true)
                         .build(),
                     contentDescription = file.path,
@@ -114,8 +114,4 @@ fun MediaSlide(
             )
         }
     }
-}
-
-private fun imageUrl(file: MediaFile, activeApiUrl: String): String {
-    return "$activeApiUrl/api/preview/${file.path}"
 }

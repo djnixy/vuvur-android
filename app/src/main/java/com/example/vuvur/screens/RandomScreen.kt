@@ -18,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import com.example.vuvur.GalleryUiState
-import com.example.vuvur.screens.MediaViewModel
 import com.example.vuvur.components.MediaSlide
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -30,6 +29,7 @@ fun RandomScreen(
     val state by viewModel.uiState.collectAsState()
     var zoomedPageIndex by remember { mutableStateOf(-1) }
     val isPagerScrollEnabled = zoomedPageIndex == -1
+    val zoomLevel = viewModel.getZoomLevel()
 
     Box(modifier = Modifier.fillMaxSize()) {
         when (val currentState = state) {
@@ -67,7 +67,8 @@ fun RandomScreen(
                         isZoomed = (zoomedPageIndex == pageIndex),
                         onZoomToggle = {
                             zoomedPageIndex = if (zoomedPageIndex == pageIndex) -1 else pageIndex
-                        }
+                        },
+                        zoomLevel = zoomLevel
                     )
                 }
             }

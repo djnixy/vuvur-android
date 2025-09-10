@@ -141,9 +141,6 @@ fun AppNavigation() {
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
                                 Icon(Icons.Default.Menu, contentDescription = "Open Menu")
                             }
-                        },
-                        actions = {
-                            // Filter/search button can be added here later
                         }
                     )
                 }
@@ -162,8 +159,18 @@ fun AppNavigation() {
                         }
                     )
                 }
-                composable(Screen.Random.route) { RandomScreen(viewModel = mediaViewModel, navController = navController) }
-                composable(Screen.Single.route) { SingleMediaScreen(viewModel = mediaViewModel, navController = navController) }
+                composable(Screen.Random.route) {
+                    RandomScreen(
+                        viewModel = mediaViewModel,
+                        navController = navController
+                    )
+                }
+                composable(Screen.Single.route) {
+                    SingleMediaScreen(
+                        viewModel = mediaViewModel,
+                        navController = navController
+                    )
+                }
                 composable(Screen.Settings.route) { SettingsScreen() }
 
                 composable(

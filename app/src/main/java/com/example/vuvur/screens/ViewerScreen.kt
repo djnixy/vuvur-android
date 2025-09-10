@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.vuvur.GalleryUiState
-//import com.example.vuvur.MediaViewModel
+import com.example.vuvur.screens.MediaViewModel
 import com.example.vuvur.components.MediaSlide
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -28,6 +28,7 @@ fun ViewerScreen(
     val state by viewModel.uiState.collectAsState()
     var zoomedPageIndex by remember { mutableStateOf(-1) }
     val isPagerScrollEnabled = zoomedPageIndex == -1
+    val zoomLevel = viewModel.getZoomLevel()
 
     Box(modifier = Modifier.fillMaxSize()) {
         when (val currentState = state) {
@@ -51,7 +52,8 @@ fun ViewerScreen(
 
                 VerticalPager(
                     state = pagerState,
-                    userScrollEnabled = isPagerScrollEnabled
+                    userScrollEnabled = isPagerScrollEnabled,
+                    modifier = Modifier.fillMaxSize()
                 ) { pageIndex ->
                     val file = currentState.files[pageIndex]
                     MediaSlide(
@@ -60,7 +62,8 @@ fun ViewerScreen(
                         isZoomed = (zoomedPageIndex == pageIndex),
                         onZoomToggle = {
                             zoomedPageIndex = if (zoomedPageIndex == pageIndex) -1 else pageIndex
-                        }
+                        },
+                        zoomLevel = zoomLevel
                     )
                 }
             }

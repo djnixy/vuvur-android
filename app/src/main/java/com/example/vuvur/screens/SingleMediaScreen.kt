@@ -1,85 +1,94 @@
 package com.example.vuvur.screens
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.pager.VerticalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.vuvur.GalleryUiState
-//import com.example.vuvur.MediaViewModel
 import com.example.vuvur.components.MediaSlide
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SingleMediaScreen(
     viewModel: MediaViewModel,
     navController: NavController
 ) {
     val state by viewModel.uiState.collectAsState()
-    var zoomedPageIndex by remember { mutableStateOf(-1) }
-    val isPagerScrollEnabled = zoomedPageIndex == -1
+    var isZoomed by remember { mutableStateOf(false) }
+    var currentIndex by remember { mutableStateOf(0) }
     val zoomLevel = viewModel.getZoomLevel()
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    // Reset zoom when switching images
+    LaunchedEffect(currentIndex) {
+        isZoomed = false
+    }
+
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when (val currentState = state) {
             is GalleryUiState.Success -> {
                 if (currentState.files.isEmpty()) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Text("No media found.")
-                    }
+                    Text("No media found.")
                     return
                 }
 
-                val pagerState = rememberPagerState(
-                    initialPage = 0,
-                    pageCount = { currentState.files.size }
-                )
+                // Ensure valid index
+                val validIndex = currentIndex.coerceIn(0, currentState.files.size - 1)
+                val currentFile = currentState.files[validIndex]
 
-                LaunchedEffect(pagerState.isScrollInProgress) {
-                    if (pagerState.isScrollInProgress) {
-                        zoomedPageIndex = -1
-                    }
-                }
-
-                LaunchedEffect(pagerState.currentPage) {
-                    if (pagerState.currentPage >= currentState.files.size - 3) {
+                // Prefetch next page when close to end
+                LaunchedEffect(currentIndex) {
+                    if (currentIndex >= currentState.files.size - 5) {
                         viewModel.loadPage(currentState.currentPage + 1)
                     }
                 }
 
-                VerticalPager(
-                    state = pagerState,
-                    userScrollEnabled = isPagerScrollEnabled,
-                    modifier = Modifier.fillMaxSize()
-                ) { pageIndex ->
-                    val file = currentState.files[pageIndex]
-                    MediaSlide(
-                        file = file,
-                        activeApiUrl = currentState.activeApiUrl,
-                        isZoomed = (zoomedPageIndex == pageIndex),
-                        onZoomToggle = {
-                            zoomedPageIndex = if (zoomedPageIndex == pageIndex) -1 else pageIndex
-                        },
-                        zoomLevel = zoomLevel
-                    )
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        MediaSlide(
+                            file = currentFile,
+                            activeApiUrl = currentState.activeApiUrl,
+                            isZoomed = isZoomed,
+                            onZoomToggle = { isZoomed = !isZoomed },
+                            zoomLevel = zoomLevel
+                        )
+
+                        // Floating "Next" button
+                        // Floating "Next" button (circle only, no text)
+                        if (!isZoomed && validIndex < currentState.files.size - 1) {
+                            IconButton(
+                                onClick = { currentIndex++ },
+                                modifier = Modifier
+                                    .align(Alignment.CenterStart)
+                                    .padding(12.dp)
+                                    .size(40.dp) // circle size
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f),
+                                            shape = CircleShape
+                                        )
+                                )
+                            }
+                        }
+
+                    }
+
+                    // Keep space at bottom so layout looks stable
+                    Spacer(modifier = Modifier.height(36.dp))
                 }
             }
             else -> {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    CircularProgressIndicator()
-                }
+                CircularProgressIndicator()
             }
         }
     }

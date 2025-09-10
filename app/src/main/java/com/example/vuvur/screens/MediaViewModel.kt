@@ -14,6 +14,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
@@ -33,6 +34,12 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
     private var currentExifQuery = ""
 
     init {
+        // Listen for refresh triggers from the repository
+        viewModelScope.launch {
+            repository.refreshTrigger.collectLatest {
+                refresh()
+            }
+        }
         loadSettingsAndFiles()
     }
 

@@ -2,11 +2,20 @@ package com.example.vuvur.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 
 class SettingsRepository(context: Context) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences("vuvur_prefs", Context.MODE_PRIVATE)
+
+    private val _refreshTrigger = MutableSharedFlow<Unit>(replay = 0)
+    val refreshTrigger = _refreshTrigger.asSharedFlow()
+
+    suspend fun triggerRefresh() {
+        _refreshTrigger.emit(Unit)
+    }
 
     var activeApiUrl: String
         get() = prefs.getString(KEY_ACTIVE_URL, DEFAULT_URLS.first()) ?: DEFAULT_URLS.first()

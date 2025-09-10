@@ -49,7 +49,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        message = "Failed to load settings from API",
+                        message = "Failed to load settings from API. Using local settings.",
                         apiList = repository.savedApiUrls.toList(),
                         activeApi = repository.activeApiUrl
                     )
@@ -60,6 +60,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun saveSettings(newSettings: AppSettings, newActiveApi: String) {
         viewModelScope.launch {
+            val oldApi = repository.activeApiUrl
             repository.activeApiUrl = newActiveApi
             repository.addApiUrl(newActiveApi)
 
@@ -72,6 +73,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         apiList = repository.savedApiUrls.toList(),
                         message = "Settings saved!"
                     )
+                }
+                if (oldApi != newActiveApi) {
+                    repository.triggerRefresh()
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(message = "Failed to save remote settings") }
