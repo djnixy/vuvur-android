@@ -9,7 +9,9 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -19,40 +21,39 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.vuvur.GalleryUiState
 import com.example.vuvur.MediaFile
-import com.example.vuvur.screens.MediaViewModel
-import com.google.accompanist.swiperefresh.SwipeRefresh
-import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+//import com.example.vuvur.MediaViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GalleryScreen(
     viewModel: MediaViewModel,
-    onImageClick: (MediaFile) -> Unit
+    onImageClick: (Int) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-        when (val currentState = state) {
-            is GalleryUiState.Loading -> CircularProgressIndicator()
+    // Determine the refreshing state based on the overall UI state
+    val isRefreshing = state is GalleryUiState.Loading
 
-            is GalleryUiState.Error -> Text("Failed to load: ${currentState.message}")
-
-            is GalleryUiState.Scanning -> Text(
-                "Scanning Library: ${currentState.progress} / ${currentState.total}"
-            )
-
-            is GalleryUiState.Success -> {
-                // Refreshing when state is Loading
-                val swipeRefreshState =
-                    rememberSwipeRefreshState(isRefreshing = state is GalleryUiState.Loading)
-
-                SwipeRefresh(
-                    state = swipeRefreshState,
-                    onRefresh = { viewModel.refresh() }
-                ) {
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = { viewModel.refresh() }
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            when (val currentState = state) {
+                is GalleryUiState.Loading -> {
+                    // Show a loading indicator only if there are no images to display yet
+                    if ((viewModel.uiState.value as? GalleryUiState.Success)?.files.isNullOrEmpty()) {
+                        CircularProgressIndicator()
+                    }
+                }
+                is GalleryUiState.Error -> Text("Failed to load: ${currentState.message}")
+                is GalleryUiState.Scanning -> Text("Scanning Library: ${currentState.progress} / ${currentState.total}")
+                is GalleryUiState.Success -> {
                     GalleryGrid(
                         files = currentState.files,
                         activeApiUrl = currentState.activeApiUrl,
@@ -72,29 +73,23 @@ fun GalleryGrid(
     files: List<MediaFile>,
     activeApiUrl: String,
     onScrolledToEnd: () -> Unit,
-    onImageClick: (MediaFile) -> Unit
+    onImageClick: (Int) -> Unit
 ) {
     LazyVerticalStaggeredGrid(
         columns = StaggeredGridCells.Adaptive(150.dp),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(4.dp)
     ) {
-        itemsIndexed(
-            files,
-            key = { _, file -> file.path } // must be unique
-        ) { index, file ->
-
-            // Trigger pagination when last item is reached
-            if (index == files.lastIndex) {
-                LaunchedEffect(index) {
+        itemsIndexed(files, key = { _, file -> file.path }) { index, file ->
+            if (index >= files.size - 10) {
+                LaunchedEffect(Unit) {
                     onScrolledToEnd()
                 }
             }
-
             MediaThumbnail(
                 file = file,
                 activeApiUrl = activeApiUrl,
-                onClick = { onImageClick(file) }
+                onClick = { onImageClick(index) }
             )
         }
     }
@@ -109,17 +104,13 @@ fun MediaThumbnail(
     val thumbnailUrl = "$activeApiUrl/api/thumbnail/${file.path}"
     val aspectRatio = if (file.height > 0 && file.width > 0) {
         file.width.toFloat() / file.height.toFloat()
-    } else {
-        1.0f
-    }
+    } else { 1.0f }
 
     AsyncImage(
-        model = ImageRequest.Builder(LocalContext.current)
-            .data(thumbnailUrl)
-            .crossfade(true)
-            .build(),
+        model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).crossfade(true).build(),
         contentDescription = file.path,
         modifier = Modifier
+            .fillMaxSize()
             .aspectRatio(aspectRatio)
             .clickable { onClick() },
         contentScale = ContentScale.Crop

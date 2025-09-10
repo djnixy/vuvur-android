@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.vuvur.ApiClient
+import com.example.vuvur.AppSettings
 import com.example.vuvur.GalleryUiState
 import com.example.vuvur.ScanStatusResponse
 import com.example.vuvur.VuvurApplication
@@ -25,34 +26,32 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow<GalleryUiState>(GalleryUiState.Loading)
     val uiState = _uiState.asStateFlow()
 
+    private var appSettings: AppSettings? = null
     private var pollingJob: Job? = null
-
-    // Global sort and filter state
     private var currentSort = "random"
     private var currentQuery = ""
     private var currentExifQuery = ""
 
     init {
-        loadPage(1, isNewSearch = true)
+        loadSettingsAndFiles()
     }
 
-    fun setSort(sortBy: String) {
-        currentSort = sortBy
-        loadPage(1, isNewSearch = true)
-    }
-
-    fun setFilter(query: String, exifQuery: String) {
-        currentQuery = query
-        currentExifQuery = exifQuery
-        loadPage(1, isNewSearch = true)
-    }
-
-    fun refresh() {
-        loadPage(1, isNewSearch = true)
+    private fun loadSettings() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (appSettings == null) {
+                    appSettings = apiService.getSettings().settings
+                }
+            } catch (e: Exception) {
+                // failed, will use default
+            }
+        }
     }
 
     fun loadPage(page: Int, isNewSearch: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
+            if (appSettings == null) { loadSettings() }
+
             val currentState = _uiState.value
             if (currentState is GalleryUiState.Success && currentState.isLoadingNextPage) return@launch
             if (currentState is GalleryUiState.Success && page > currentState.totalPages) return@launch
@@ -121,5 +120,20 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    fun getZoomLevel(): Float {
+        return appSettings?.zoom_level?.toFloat() ?: 2.5f
+    }
+
+    fun loadSettingsAndFiles() {
+        viewModelScope.launch {
+            loadSettings()
+            loadPage(1, isNewSearch = true)
+        }
+    }
+
+    fun refresh() {
+        loadPage(1, isNewSearch = true)
     }
 }

@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,6 +17,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.vuvur.MediaFile
@@ -31,14 +37,10 @@ fun MediaSlide(
     val verticalScrollState = rememberScrollState()
     val horizontalScrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
-    // This effect now ALSO watches for changes to the scrollbar max values.
-    // This fixes the race condition.
     LaunchedEffect(isZoomed, verticalScrollState.maxValue, horizontalScrollState.maxValue) {
         if (isZoomed) {
-            // It will run once when isZoomed=true (maxes are 0),
-            // and then run AGAIN when the layout calculates the new max values.
-            // We scroll to the center only when the max values are available.
             val hMax = horizontalScrollState.maxValue
             val vMax = verticalScrollState.maxValue
             if (hMax > 0 || vMax > 0) {
@@ -61,19 +63,19 @@ fun MediaSlide(
                 )
             }
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (isZoomed) Modifier
-                    .verticalScroll(verticalScrollState)
-                    .horizontalScroll(horizontalScrollState)
-                else Modifier
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            if (file.type == "image") {
+        if (file.type == "image") {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (isZoomed) Modifier
+                        .verticalScroll(verticalScrollState)
+                        .horizontalScroll(horizontalScrollState)
+                    else Modifier
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
+                    model = ImageRequest.Builder(context)
                         .data(imageUrl(file, activeApiUrl))
                         .crossfade(true)
                         .build(),
@@ -86,17 +88,30 @@ fun MediaSlide(
                         .fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
-            } else {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(imageUrl(file, activeApiUrl))
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = file.path,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
             }
+        } else {
+            val exoPlayer = remember {
+                ExoPlayer.Builder(context).build().apply {
+                    val mediaItem = MediaItem.fromUri("$activeApiUrl/api/view/all/${file.path}")
+                    setMediaItem(mediaItem)
+                    prepare()
+                    playWhenReady = true
+                }
+            }
+            DisposableEffect(Unit) {
+                onDispose {
+                    exoPlayer.release()
+                }
+            }
+            AndroidView(
+                factory = {
+                    PlayerView(it).apply {
+                        player = exoPlayer
+                        useController = true
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }

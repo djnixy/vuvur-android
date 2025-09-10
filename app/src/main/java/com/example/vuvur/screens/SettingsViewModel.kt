@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.vuvur.ApiClient
 import com.example.vuvur.AppSettings
 import com.example.vuvur.VuvurApplication
-import com.example.vuvur.data.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -50,7 +49,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        message = "Failed to load settings from API. Using local settings.",
+                        message = "Failed to load settings from API",
                         apiList = repository.savedApiUrls.toList(),
                         activeApi = repository.activeApiUrl
                     )

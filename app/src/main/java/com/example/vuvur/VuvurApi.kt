@@ -10,10 +10,8 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 
-// All data classes have been moved to DataModels.kt
-
 interface VuvurApiService {
-    @GET("/api/files")
+    @GET("/api/media")
     suspend fun getFiles(
         @Query("sort") sortBy: String,
         @Query("q") query: String,
@@ -21,7 +19,7 @@ interface VuvurApiService {
         @Query("page") page: Int
     ): PaginatedFileResponse
 
-    @GET("/api/files")
+    @GET("/api/media")
     suspend fun getFilesScanning(@Query("page") page: Int): ScanStatusResponse
 
     @GET("/api/scan-status")
@@ -29,6 +27,9 @@ interface VuvurApiService {
 
     @GET("/api/files/random")
     suspend fun getRandomFiles(@Query("count") count: Int): List<MediaFile>
+
+    @GET("/api/random-single")
+    suspend fun getRandomSingle(@Query("q") query: String): MediaFile
 
     @GET("/api/settings")
     suspend fun getSettings(): SettingsResponse

@@ -26,7 +26,6 @@ class SettingsRepository(context: Context) {
         private const val KEY_ACTIVE_URL = "active_api_url"
         private const val KEY_URL_LIST = "api_url_list"
 
-        // Your saved default URLs
         val DEFAULT_URLS = listOf(
             "http://100.97.27.128:5001",
             "http://100.97.27.128:5002",

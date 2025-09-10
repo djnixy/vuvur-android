@@ -1,8 +1,6 @@
 package com.example.vuvur.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.FlingBehavior
-import androidx.compose.foundation.gestures.ScrollScope
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.VerticalPager
@@ -20,14 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import com.example.vuvur.GalleryUiState
-import com.example.vuvur.screens.MediaViewModel
+//import com.example.vuvur.MediaViewModel
 import com.example.vuvur.components.MediaSlide
-
-private val NoFlingBehavior = object : FlingBehavior {
-    override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
-        return 0f
-    }
-}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -38,6 +30,7 @@ fun SingleMediaScreen(
     val state by viewModel.uiState.collectAsState()
     var zoomedPageIndex by remember { mutableStateOf(-1) }
     val isPagerScrollEnabled = zoomedPageIndex == -1
+    val zoomLevel = viewModel.getZoomLevel()
 
     Box(modifier = Modifier.fillMaxSize()) {
         when (val currentState = state) {
@@ -49,7 +42,10 @@ fun SingleMediaScreen(
                     return
                 }
 
-                val pagerState = rememberPagerState(pageCount = { currentState.files.size })
+                val pagerState = rememberPagerState(
+                    initialPage = 0,
+                    pageCount = { currentState.files.size }
+                )
 
                 LaunchedEffect(pagerState.isScrollInProgress) {
                     if (pagerState.isScrollInProgress) {
@@ -66,8 +62,7 @@ fun SingleMediaScreen(
                 VerticalPager(
                     state = pagerState,
                     userScrollEnabled = isPagerScrollEnabled,
-                    modifier = Modifier.fillMaxSize(),
-                    flingBehavior = NoFlingBehavior
+                    modifier = Modifier.fillMaxSize()
                 ) { pageIndex ->
                     val file = currentState.files[pageIndex]
                     MediaSlide(
@@ -76,7 +71,8 @@ fun SingleMediaScreen(
                         isZoomed = (zoomedPageIndex == pageIndex),
                         onZoomToggle = {
                             zoomedPageIndex = if (zoomedPageIndex == pageIndex) -1 else pageIndex
-                        }
+                        },
+                        zoomLevel = zoomLevel
                     )
                 }
             }

@@ -18,7 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import com.example.vuvur.GalleryUiState
-import com.example.vuvur.screensMediaViewModel
+import com.example.vuvur.screens.MediaViewModel
 import com.example.vuvur.components.MediaSlide
 
 @OptIn(ExperimentalFoundationApi::class)
