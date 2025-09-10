@@ -115,7 +115,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             Spacer(Modifier.height(8.dp))
 
             Button(onClick = { viewModel.saveSettings(localSettings!!, localActiveApi) }) {
-                Text("Save All Settings")
+                Text("Save")
             }
 
             Divider(modifier = Modifier.padding(vertical = 16.dp))
