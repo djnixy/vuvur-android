@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.vuvur.ApiClient
 import com.example.vuvur.AppSettings
 import com.example.vuvur.VuvurApplication
-import com.example.vuvur.data.SettingsRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -61,6 +60,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun saveSettings(newSettings: AppSettings, newActiveApi: String) {
         viewModelScope.launch {
+            val oldApi = repository.activeApiUrl
             repository.activeApiUrl = newActiveApi
             repository.addApiUrl(newActiveApi)
 
@@ -73,6 +73,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         apiList = repository.savedApiUrls.toList(),
                         message = "Settings saved!"
                     )
+                }
+                if (oldApi != newActiveApi) {
+                    repository.triggerRefresh()
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(message = "Failed to save remote settings") }

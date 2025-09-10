@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CropPortrait
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
@@ -44,9 +45,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.vuvur.screens.GalleryScreen
-import com.example.vuvur.screens.GalleryViewModel
+import com.example.vuvur.screens.MediaViewModel
 import com.example.vuvur.screens.RandomScreen
 import com.example.vuvur.screens.SettingsScreen
+import com.example.vuvur.screens.SingleMediaScreen
 import com.example.vuvur.screens.ViewerScreen
 import com.example.vuvur.ui.theme.VuvurTheme
 import kotlinx.coroutines.launch
@@ -54,6 +56,7 @@ import kotlinx.coroutines.launch
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     data object Gallery : Screen("gallery", "Gallery", Icons.Default.Home)
     data object Random : Screen("random", "Random", Icons.Default.Shuffle)
+    data object Single : Screen("single", "Single", Icons.Default.CropPortrait)
     data object Settings : Screen("settings", "Settings", Icons.Default.Settings)
     data object Viewer : Screen("viewer/{startIndex}", "Viewer", Icons.Default.Home)
 }
@@ -61,6 +64,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 val menuItems = listOf(
     Screen.Gallery,
     Screen.Random,
+    Screen.Single,
     Screen.Settings
 )
 
@@ -88,15 +92,14 @@ fun AppNavigation() {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    val galleryViewModel: GalleryViewModel = viewModel()
+    val mediaViewModel: MediaViewModel = viewModel()
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
     val route = currentDestination?.route
-    val isRandom = route == Screen.Random.route
-    val isViewer = route?.startsWith("viewer") == true
-    val gesturesEnabled = !isRandom && !isViewer
+    val isFullscreen = route == Screen.Random.route || route == Screen.Single.route || route?.startsWith("viewer") == true
+    val gesturesEnabled = !isFullscreen
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -126,7 +129,7 @@ fun AppNavigation() {
     ) {
         Scaffold(
             topBar = {
-                if (!isRandom && !isViewer) {
+                if (!isFullscreen) {
                     TopAppBar(
                         title = {
                             val currentTitle = menuItems.find { item ->
@@ -146,17 +149,28 @@ fun AppNavigation() {
             NavHost(
                 navController = navController,
                 startDestination = Screen.Gallery.route,
-                modifier = if (!isRandom && !isViewer) Modifier.padding(innerPadding) else Modifier.fillMaxSize()
+                modifier = if (!isFullscreen) Modifier.padding(innerPadding) else Modifier.fillMaxSize()
             ) {
                 composable(Screen.Gallery.route) {
                     GalleryScreen(
-                        viewModel = galleryViewModel,
+                        viewModel = mediaViewModel,
                         onImageClick = { index ->
                             navController.navigate("viewer/$index")
                         }
                     )
                 }
-                composable(Screen.Random.route) { RandomScreen(navController = navController) }
+                composable(Screen.Random.route) {
+                    RandomScreen(
+                        viewModel = mediaViewModel,
+                        navController = navController
+                    )
+                }
+                composable(Screen.Single.route) {
+                    SingleMediaScreen(
+                        viewModel = mediaViewModel,
+                        navController = navController
+                    )
+                }
                 composable(Screen.Settings.route) { SettingsScreen() }
 
                 composable(
@@ -164,7 +178,7 @@ fun AppNavigation() {
                     arguments = listOf(navArgument("startIndex") { type = NavType.IntType })
                 ) { backStackEntry ->
                     ViewerScreen(
-                        viewModel = galleryViewModel,
+                        viewModel = mediaViewModel,
                         startIndex = backStackEntry.arguments?.getInt("startIndex") ?: 0,
                         navController = navController
                     )

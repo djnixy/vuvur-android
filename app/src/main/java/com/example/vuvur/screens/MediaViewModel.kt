@@ -14,11 +14,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
-class GalleryViewModel(application: Application) : AndroidViewModel(application) {
+class MediaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = (application as VuvurApplication).settingsRepository
     private val apiService = ApiClient.createService(repository)
@@ -33,6 +34,12 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
     private var currentExifQuery = ""
 
     init {
+        // Listen for refresh triggers from the repository
+        viewModelScope.launch {
+            repository.refreshTrigger.collectLatest {
+                refresh()
+            }
+        }
         loadSettingsAndFiles()
     }
 
@@ -48,17 +55,18 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun loadPage(page: Int) {
+    fun loadPage(page: Int, isNewSearch: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
-            if (appSettings == null) { loadSettings() } // Ensure settings are loaded
+            if (appSettings == null) { loadSettings() }
 
-            val isFirstPage = page == 1
-            if (isFirstPage) {
+            val currentState = _uiState.value
+            if (currentState is GalleryUiState.Success && currentState.isLoadingNextPage) return@launch
+            if (currentState is GalleryUiState.Success && page > currentState.totalPages) return@launch
+
+            if (isNewSearch) {
                 _uiState.value = GalleryUiState.Loading
-            } else {
-                (_uiState.value as? GalleryUiState.Success)?.let {
-                    _uiState.value = it.copy(isLoadingNextPage = true)
-                }
+            } else if (currentState is GalleryUiState.Success) {
+                _uiState.value = currentState.copy(isLoadingNextPage = true)
             }
 
             try {
@@ -69,9 +77,9 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
                     page = page
                 )
                 _uiState.update {
-                    val currentFiles = (it as? GalleryUiState.Success)?.files ?: emptyList()
+                    val currentFiles = if (isNewSearch) emptyList() else (it as? GalleryUiState.Success)?.files ?: emptyList()
                     GalleryUiState.Success(
-                        files = if (isFirstPage) response.items else currentFiles + response.items,
+                        files = currentFiles + response.items,
                         totalPages = response.total_pages,
                         currentPage = response.page,
                         isLoadingNextPage = false,
@@ -79,21 +87,25 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
                     )
                 }
             } catch (e: HttpException) {
-                try {
-                    val errorBody = e.response()?.errorBody()?.string() ?: ""
-                    val scanStatus = Gson().fromJson(errorBody, ScanStatusResponse::class.java)
-                    if (scanStatus.status == "scanning") {
-                        _uiState.value = GalleryUiState.Scanning(scanStatus.progress, scanStatus.total)
-                        startPollingForScanStatus()
-                    } else {
-                        _uiState.value = GalleryUiState.Error(e.message())
-                    }
-                } catch (jsonError: Exception) {
-                    _uiState.value = GalleryUiState.Error(e.message())
-                }
+                handleApiError(e)
             } catch (e: Exception) {
                 _uiState.value = GalleryUiState.Error(e.message ?: "Unknown error")
             }
+        }
+    }
+
+    private fun handleApiError(e: HttpException) {
+        try {
+            val errorBody = e.response()?.errorBody()?.string() ?: ""
+            val scanStatus = Gson().fromJson(errorBody, ScanStatusResponse::class.java)
+            if (scanStatus.status == "scanning") {
+                _uiState.value = GalleryUiState.Scanning(scanStatus.progress, scanStatus.total)
+                startPollingForScanStatus()
+            } else {
+                _uiState.value = GalleryUiState.Error(e.message())
+            }
+        } catch (jsonError: Exception) {
+            _uiState.value = GalleryUiState.Error(e.message())
         }
     }
 
@@ -105,7 +117,7 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
                 try {
                     val status = apiService.getScanStatus()
                     if (status.status == "complete") {
-                        loadPage(1)
+                        refresh()
                         break
                     } else {
                         _uiState.value = GalleryUiState.Scanning(status.progress, status.total)
@@ -124,7 +136,11 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
     fun loadSettingsAndFiles() {
         viewModelScope.launch {
             loadSettings()
-            loadPage(1)
+            loadPage(1, isNewSearch = true)
         }
+    }
+
+    fun refresh() {
+        loadPage(1, isNewSearch = true)
     }
 }
