@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.vuvur.ApiClient
-import com.example.vuvur.AppSettings
 import com.example.vuvur.GalleryUiState
 import com.example.vuvur.ScanStatusResponse
 import com.example.vuvur.VuvurApplication
@@ -18,7 +17,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
-class GalleryViewModel(application: Application) : AndroidViewModel(application) {
+class MediaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = (application as VuvurApplication).settingsRepository
     private val apiService = ApiClient.createService(repository)
@@ -26,39 +25,42 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
     private val _uiState = MutableStateFlow<GalleryUiState>(GalleryUiState.Loading)
     val uiState = _uiState.asStateFlow()
 
-    private var appSettings: AppSettings? = null
     private var pollingJob: Job? = null
+
+    // Global sort and filter state
     private var currentSort = "random"
     private var currentQuery = ""
     private var currentExifQuery = ""
 
     init {
-        loadSettingsAndFiles()
+        loadPage(1, isNewSearch = true)
     }
 
-    private fun loadSettings() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                if (appSettings == null) {
-                    appSettings = apiService.getSettings().settings
-                }
-            } catch (e: Exception) {
-                // failed, will use default
-            }
-        }
+    fun setSort(sortBy: String) {
+        currentSort = sortBy
+        loadPage(1, isNewSearch = true)
     }
 
-    fun loadPage(page: Int) {
-        viewModelScope.launch(Dispatchers.IO) {
-            if (appSettings == null) { loadSettings() } // Ensure settings are loaded
+    fun setFilter(query: String, exifQuery: String) {
+        currentQuery = query
+        currentExifQuery = exifQuery
+        loadPage(1, isNewSearch = true)
+    }
 
-            val isFirstPage = page == 1
-            if (isFirstPage) {
+    fun refresh() {
+        loadPage(1, isNewSearch = true)
+    }
+
+    fun loadPage(page: Int, isNewSearch: Boolean = false) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val currentState = _uiState.value
+            if (currentState is GalleryUiState.Success && currentState.isLoadingNextPage) return@launch
+            if (currentState is GalleryUiState.Success && page > currentState.totalPages) return@launch
+
+            if (isNewSearch) {
                 _uiState.value = GalleryUiState.Loading
-            } else {
-                (_uiState.value as? GalleryUiState.Success)?.let {
-                    _uiState.value = it.copy(isLoadingNextPage = true)
-                }
+            } else if (currentState is GalleryUiState.Success) {
+                _uiState.value = currentState.copy(isLoadingNextPage = true)
             }
 
             try {
@@ -69,9 +71,9 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
                     page = page
                 )
                 _uiState.update {
-                    val currentFiles = (it as? GalleryUiState.Success)?.files ?: emptyList()
+                    val currentFiles = if (isNewSearch) emptyList() else (it as? GalleryUiState.Success)?.files ?: emptyList()
                     GalleryUiState.Success(
-                        files = if (isFirstPage) response.items else currentFiles + response.items,
+                        files = currentFiles + response.items,
                         totalPages = response.total_pages,
                         currentPage = response.page,
                         isLoadingNextPage = false,
@@ -79,21 +81,25 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
                     )
                 }
             } catch (e: HttpException) {
-                try {
-                    val errorBody = e.response()?.errorBody()?.string() ?: ""
-                    val scanStatus = Gson().fromJson(errorBody, ScanStatusResponse::class.java)
-                    if (scanStatus.status == "scanning") {
-                        _uiState.value = GalleryUiState.Scanning(scanStatus.progress, scanStatus.total)
-                        startPollingForScanStatus()
-                    } else {
-                        _uiState.value = GalleryUiState.Error(e.message())
-                    }
-                } catch (jsonError: Exception) {
-                    _uiState.value = GalleryUiState.Error(e.message())
-                }
+                handleApiError(e)
             } catch (e: Exception) {
                 _uiState.value = GalleryUiState.Error(e.message ?: "Unknown error")
             }
+        }
+    }
+
+    private fun handleApiError(e: HttpException) {
+        try {
+            val errorBody = e.response()?.errorBody()?.string() ?: ""
+            val scanStatus = Gson().fromJson(errorBody, ScanStatusResponse::class.java)
+            if (scanStatus.status == "scanning") {
+                _uiState.value = GalleryUiState.Scanning(scanStatus.progress, scanStatus.total)
+                startPollingForScanStatus()
+            } else {
+                _uiState.value = GalleryUiState.Error(e.message())
+            }
+        } catch (jsonError: Exception) {
+            _uiState.value = GalleryUiState.Error(e.message())
         }
     }
 
@@ -105,7 +111,7 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
                 try {
                     val status = apiService.getScanStatus()
                     if (status.status == "complete") {
-                        loadPage(1)
+                        refresh()
                         break
                     } else {
                         _uiState.value = GalleryUiState.Scanning(status.progress, status.total)
@@ -114,17 +120,6 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
                     // continue polling
                 }
             }
-        }
-    }
-
-    fun getZoomLevel(): Float {
-        return appSettings?.zoom_level?.toFloat() ?: 2.5f
-    }
-
-    fun loadSettingsAndFiles() {
-        viewModelScope.launch {
-            loadSettings()
-            loadPage(1)
         }
     }
 }

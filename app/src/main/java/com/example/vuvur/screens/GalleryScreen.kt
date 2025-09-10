@@ -19,41 +19,49 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.vuvur.ApiClient
 import com.example.vuvur.GalleryUiState
 import com.example.vuvur.MediaFile
-import com.example.vuvur.screens.GalleryViewModel
+import com.example.vuvur.screens.MediaViewModel
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 
 @Composable
 fun GalleryScreen(
-    viewModel: GalleryViewModel,
-    onImageClick: (Int) -> Unit
+    viewModel: MediaViewModel,
+    onImageClick: (MediaFile) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
 
     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
         when (val currentState = state) {
-            is GalleryUiState.Loading -> {
-                CircularProgressIndicator()
-            }
-            is GalleryUiState.Error -> {
-                Text("Failed to load: ${currentState.message}")
-            }
-            is GalleryUiState.Scanning -> {
-                Text("Scanning Library: ${currentState.progress} / ${currentState.total}")
-            }
+            is GalleryUiState.Loading -> CircularProgressIndicator()
+
+            is GalleryUiState.Error -> Text("Failed to load: ${currentState.message}")
+
+            is GalleryUiState.Scanning -> Text(
+                "Scanning Library: ${currentState.progress} / ${currentState.total}"
+            )
+
             is GalleryUiState.Success -> {
-                GalleryGrid(
-                    files = currentState.files,
-                    activeApiUrl = currentState.activeApiUrl,
-                    onScrolledToEnd = {
-                        viewModel.loadPage(currentState.currentPage + 1)
-                    },
-                    onImageClick = onImageClick
-                )
+                // Refreshing when state is Loading
+                val swipeRefreshState =
+                    rememberSwipeRefreshState(isRefreshing = state is GalleryUiState.Loading)
+
+                SwipeRefresh(
+                    state = swipeRefreshState,
+                    onRefresh = { viewModel.refresh() }
+                ) {
+                    GalleryGrid(
+                        files = currentState.files,
+                        activeApiUrl = currentState.activeApiUrl,
+                        onScrolledToEnd = {
+                            viewModel.loadPage(currentState.currentPage + 1)
+                        },
+                        onImageClick = onImageClick
+                    )
+                }
             }
         }
     }
@@ -64,23 +72,29 @@ fun GalleryGrid(
     files: List<MediaFile>,
     activeApiUrl: String,
     onScrolledToEnd: () -> Unit,
-    onImageClick: (Int) -> Unit
+    onImageClick: (MediaFile) -> Unit
 ) {
     LazyVerticalStaggeredGrid(
         columns = StaggeredGridCells.Adaptive(150.dp),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(4.dp)
     ) {
-        itemsIndexed(files) { index, file ->
-            if (index >= files.size - 10) {
-                LaunchedEffect(Unit) {
+        itemsIndexed(
+            files,
+            key = { _, file -> file.path } // must be unique
+        ) { index, file ->
+
+            // Trigger pagination when last item is reached
+            if (index == files.lastIndex) {
+                LaunchedEffect(index) {
                     onScrolledToEnd()
                 }
             }
+
             MediaThumbnail(
                 file = file,
                 activeApiUrl = activeApiUrl,
-                onClick = { onImageClick(index) }
+                onClick = { onImageClick(file) }
             )
         }
     }
@@ -106,7 +120,6 @@ fun MediaThumbnail(
             .build(),
         contentDescription = file.path,
         modifier = Modifier
-            .fillMaxSize()
             .aspectRatio(aspectRatio)
             .clickable { onClick() },
         contentScale = ContentScale.Crop

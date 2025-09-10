@@ -1,6 +1,8 @@
 package com.example.vuvur.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.FlingBehavior
+import androidx.compose.foundation.gestures.ScrollScope
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.VerticalPager
@@ -18,12 +20,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavController
 import com.example.vuvur.GalleryUiState
-import com.example.vuvur.screensMediaViewModel
+import com.example.vuvur.screens.MediaViewModel
 import com.example.vuvur.components.MediaSlide
+
+private val NoFlingBehavior = object : FlingBehavior {
+    override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
+        return 0f
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun RandomScreen(
+fun SingleMediaScreen(
     viewModel: MediaViewModel,
     navController: NavController
 ) {
@@ -58,7 +66,8 @@ fun RandomScreen(
                 VerticalPager(
                     state = pagerState,
                     userScrollEnabled = isPagerScrollEnabled,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    flingBehavior = NoFlingBehavior
                 ) { pageIndex ->
                     val file = currentState.files[pageIndex]
                     MediaSlide(
