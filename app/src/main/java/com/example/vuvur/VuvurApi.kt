@@ -11,18 +11,14 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface VuvurApiService {
-    @GET("/api/media")
+    @GET("/api/gallery")
     suspend fun getFiles(
         @Query("sort") sortBy: String,
         @Query("q") query: String,
-        @Query("exif_q") exifQuery: String,
         @Query("page") page: Int
     ): PaginatedFileResponse
 
-    @GET("/api/media")
-    suspend fun getFilesScanning(@Query("page") page: Int): ScanStatusResponse
-
-    @GET("/api/scan-status")
+    @GET("/api/scan/status")
     suspend fun getScanStatus(): ScanStatusResponse
 
     @GET("/api/files/random")

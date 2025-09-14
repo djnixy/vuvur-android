@@ -31,7 +31,6 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
     private var pollingJob: Job? = null
     private var currentSort = "random"
     private var currentQuery = ""
-    private var currentExifQuery = ""
 
     init {
         // Listen for refresh triggers from the repository
@@ -73,7 +72,6 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                 val response = apiService.getFiles(
                     sortBy = currentSort,
                     query = currentQuery,
-                    exifQuery = currentExifQuery,
                     page = page
                 )
                 _uiState.update {
@@ -95,17 +93,18 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun handleApiError(e: HttpException) {
-        try {
-            val errorBody = e.response()?.errorBody()?.string() ?: ""
-            val scanStatus = Gson().fromJson(errorBody, ScanStatusResponse::class.java)
-            if (scanStatus.status == "scanning") {
-                _uiState.value = GalleryUiState.Scanning(scanStatus.progress, scanStatus.total)
-                startPollingForScanStatus()
-            } else {
-                _uiState.value = GalleryUiState.Error(e.message())
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val scanStatus = apiService.getScanStatus()
+                if (!scanStatus.scan_complete) {
+                    _uiState.value = GalleryUiState.Scanning(scanStatus.progress, scanStatus.total)
+                    startPollingForScanStatus()
+                } else {
+                    _uiState.value = GalleryUiState.Error("Error: ${e.code()}")
+                }
+            } catch (e: Exception) {
+                _uiState.value = GalleryUiState.Error(e.message ?: "Unknown error")
             }
-        } catch (jsonError: Exception) {
-            _uiState.value = GalleryUiState.Error(e.message())
         }
     }
 
@@ -116,7 +115,7 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                 delay(2000)
                 try {
                     val status = apiService.getScanStatus()
-                    if (status.status == "complete") {
+                    if (status.scan_complete) {
                         refresh()
                         break
                     } else {

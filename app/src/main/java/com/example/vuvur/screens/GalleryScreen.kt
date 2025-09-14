@@ -80,7 +80,7 @@ fun GalleryGrid(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(4.dp)
     ) {
-        itemsIndexed(files, key = { _, file -> file.path }) { index, file ->
+        itemsIndexed(files, key = { _, file -> file.id }) { index, file ->
             if (index >= files.size - 10) {
                 LaunchedEffect(Unit) {
                     onScrolledToEnd()
@@ -101,7 +101,7 @@ fun MediaThumbnail(
     activeApiUrl: String,
     onClick: () -> Unit
 ) {
-    val thumbnailUrl = "$activeApiUrl/api/thumbnail/${file.path}"
+    val thumbnailUrl = "$activeApiUrl/api/thumbnails/${file.id}"
     val aspectRatio = if (file.height > 0 && file.width > 0) {
         file.width.toFloat() / file.height.toFloat()
     } else { 1.0f }

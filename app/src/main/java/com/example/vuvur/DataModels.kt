@@ -1,6 +1,7 @@
 package com.example.vuvur
 
 data class MediaFile(
+    val id: Int,
     val path: String,
     val type: String,
     val width: Int,
@@ -17,7 +18,7 @@ data class PaginatedFileResponse(
 )
 
 data class ScanStatusResponse(
-    val status: String,
+    val scan_complete: Boolean,
     val progress: Int,
     val total: Int
 )
