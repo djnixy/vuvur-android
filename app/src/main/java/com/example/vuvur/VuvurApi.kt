@@ -6,7 +6,6 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
@@ -28,11 +27,7 @@ interface VuvurApiService {
     @GET("/api/random-single")
     suspend fun getRandomSingle(@Query("q") query: String): MediaFile
 
-    @GET("/api/settings")
-    suspend fun getSettings(): SettingsResponse
-
-    @POST("/api/settings")
-    suspend fun saveSettings(@Body settings: AppSettings): AppSettings
+    // ✅ Removed getSettings and saveSettings
 
     @POST("/api/cache/cleanup")
     suspend fun cleanCache(): CleanupResponse
@@ -44,7 +39,6 @@ object ApiClient {
     fun createService(repository: SettingsRepository): VuvurApiService {
 
         val interceptor = Interceptor { chain ->
-            // ✅ This line will now work correctly!
             val activeUrl = repository.activeApiUrl.toHttpUrl()
             val newUrl = chain.request().url.newBuilder()
                 .scheme(activeUrl.scheme)

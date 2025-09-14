@@ -23,17 +23,7 @@ data class ScanStatusResponse(
     val total: Int
 )
 
-data class AppSettings(
-    val scan_interval: Int,
-    val batch_size: Int,
-    val preload_count: Int,
-    val zoom_level: Double
-)
-
-data class SettingsResponse(
-    val settings: AppSettings,
-    val locked_keys: List<String>
-)
+// ✅ Removed AppSettings and SettingsResponse
 
 data class CleanupResponse(
     val message: String,

@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.vuvur.ApiClient
-import com.example.vuvur.AppSettings
 import com.example.vuvur.GalleryUiState
 import com.example.vuvur.VuvurApplication
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +25,6 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow<GalleryUiState>(GalleryUiState.Loading)
     val uiState = _uiState.asStateFlow()
 
-    private var appSettings: AppSettings? = null
     private var pollingJob: Job? = null
     private var currentSort = "random"
     private var currentQuery = ""
@@ -37,25 +35,12 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                 refresh()
             }
         }
-        loadSettingsAndFiles()
-    }
-
-    private fun loadSettings() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                if (appSettings == null) {
-                    appSettings = apiService.getSettings().settings
-                }
-            } catch (e: Exception) {
-                // failed, will use default
-            }
-        }
+        // ✅ Simplified: No longer loads settings from API
+        loadPage(1, isNewSearch = true)
     }
 
     fun loadPage(page: Int, isNewSearch: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
-            if (appSettings == null) { loadSettings() }
-
             val currentState = _uiState.value
             if (currentState is GalleryUiState.Success && currentState.isLoadingNextPage) return@launch
             if (currentState is GalleryUiState.Success && page > currentState.totalPages) return@launch
@@ -79,7 +64,6 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                     } else {
                         it.files
                     }
-                    // ✅ FIX: Filter out duplicate items before adding them to the list
                     val newItems = response.items.filter { newItem -> currentFiles.none { it.id == newItem.id } }
 
                     GalleryUiState.Success(
@@ -134,15 +118,9 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // ✅ Hard-coded zoom level
     fun getZoomLevel(): Float {
-        return appSettings?.zoom_level?.toFloat() ?: 2.5f
-    }
-
-    fun loadSettingsAndFiles() {
-        viewModelScope.launch {
-            loadSettings()
-            loadPage(1, isNewSearch = true)
-        }
+        return 2.5f
     }
 
     fun refresh() {
