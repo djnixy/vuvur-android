@@ -7,7 +7,7 @@ data class MediaFile(
     val width: Int,
     val height: Int,
     val mod_time: Double,
-    val exif: Map<String, Any>
+    val exif: Map<String, Any> = emptyMap()
 )
 
 data class PaginatedFileResponse(

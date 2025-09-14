@@ -47,7 +47,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth() // ✅ Corrected: Changed from fillMaxSize()
                 .padding(padding)
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState()),

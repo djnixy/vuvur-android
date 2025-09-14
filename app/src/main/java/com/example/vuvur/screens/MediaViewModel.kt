@@ -6,15 +6,14 @@ import androidx.lifecycle.viewModelScope
 import com.example.vuvur.ApiClient
 import com.example.vuvur.AppSettings
 import com.example.vuvur.GalleryUiState
-import com.example.vuvur.ScanStatusResponse
 import com.example.vuvur.VuvurApplication
-import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
@@ -33,7 +32,6 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
     private var currentQuery = ""
 
     init {
-        // Listen for refresh triggers from the repository
         viewModelScope.launch {
             repository.refreshTrigger.collectLatest {
                 refresh()
@@ -69,19 +67,27 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             try {
+                val activeApiUrl = repository.activeApiUrlFlow.first()
                 val response = apiService.getFiles(
                     sortBy = currentSort,
                     query = currentQuery,
                     page = page
                 )
                 _uiState.update {
-                    val currentFiles = if (isNewSearch) emptyList() else (it as? GalleryUiState.Success)?.files ?: emptyList()
+                    val currentFiles = if (isNewSearch || it !is GalleryUiState.Success) {
+                        emptyList()
+                    } else {
+                        it.files
+                    }
+                    // ✅ FIX: Filter out duplicate items before adding them to the list
+                    val newItems = response.items.filter { newItem -> currentFiles.none { it.id == newItem.id } }
+
                     GalleryUiState.Success(
-                        files = currentFiles + response.items,
+                        files = currentFiles + newItems,
                         totalPages = response.total_pages,
                         currentPage = response.page,
                         isLoadingNextPage = false,
-                        activeApiUrl = repository.activeApiUrl
+                        activeApiUrl = activeApiUrl
                     )
                 }
             } catch (e: HttpException) {
