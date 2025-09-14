@@ -1,6 +1,7 @@
 package com.example.vuvur
 
 import com.example.vuvur.data.SettingsRepository
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -11,18 +12,14 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface VuvurApiService {
-    @GET("/api/media")
+    @GET("/api/gallery")
     suspend fun getFiles(
         @Query("sort") sortBy: String,
         @Query("q") query: String,
-        @Query("exif_q") exifQuery: String,
         @Query("page") page: Int
     ): PaginatedFileResponse
 
-    @GET("/api/media")
-    suspend fun getFilesScanning(@Query("page") page: Int): ScanStatusResponse
-
-    @GET("/api/scan-status")
+    @GET("/api/scan/status")
     suspend fun getScanStatus(): ScanStatusResponse
 
     @GET("/api/files/random")
@@ -47,18 +44,18 @@ object ApiClient {
     fun createService(repository: SettingsRepository): VuvurApiService {
 
         val interceptor = Interceptor { chain ->
-            var request = chain.request()
-            val activeUrlFull = repository.activeApiUrl
-            val activeHost = activeUrlFull.substringAfter("http://").substringBefore(":")
-            val activePort = activeUrlFull.substringAfterLast(":").removeSuffix("/").toInt()
-
-            val newUrl = request.url.newBuilder()
-                .host(activeHost)
-                .port(activePort)
-                .scheme("http")
+            // ✅ This line will now work correctly!
+            val activeUrl = repository.activeApiUrl.toHttpUrl()
+            val newUrl = chain.request().url.newBuilder()
+                .scheme(activeUrl.scheme)
+                .host(activeUrl.host)
+                .port(activeUrl.port)
                 .build()
 
-            request = request.newBuilder().url(newUrl).build()
+            val request = chain.request().newBuilder()
+                .url(newUrl)
+                .build()
+
             chain.proceed(request)
         }
 

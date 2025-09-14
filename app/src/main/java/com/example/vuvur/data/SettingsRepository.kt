@@ -1,46 +1,65 @@
 package com.example.vuvur.data
 
 import android.content.Context
-import android.content.SharedPreferences
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
-class SettingsRepository(context: Context) {
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences("vuvur_prefs", Context.MODE_PRIVATE)
+class SettingsRepository(
+    private val dataStore: DataStore<Preferences>,
+    private val scope: CoroutineScope
+) {
 
-    private val _refreshTrigger = MutableSharedFlow<Unit>(replay = 0)
+    private object PreferencesKeys {
+        val ACTIVE_API_URL = stringPreferencesKey("active_api_url")
+        val API_LIST = stringSetPreferencesKey("api_list")
+    }
+
+    // ✅ Updated the default IP addresses
+    private val DEFAULT_API_LIST = listOf(
+        "http://100.97.27.128:5001/",
+        "http://100.97.27.128:5002/",
+        "http://100.78.149.91:5001/",
+        "http://100.78.149.91:5002/"
+    )
+
+    var activeApiUrl: String = DEFAULT_API_LIST.first()
+        private set
+
+    val activeApiUrlFlow: Flow<String> = dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.ACTIVE_API_URL] ?: DEFAULT_API_LIST.first()
+    }
+
+    val apiListFlow: Flow<List<String>> = dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.API_LIST]?.toList()?.takeIf { it.isNotEmpty() } ?: DEFAULT_API_LIST
+    }
+
+    private val _refreshTrigger = MutableSharedFlow<Unit>(replay = 1)
     val refreshTrigger = _refreshTrigger.asSharedFlow()
 
-    suspend fun triggerRefresh() {
-        _refreshTrigger.emit(Unit)
+    init {
+        scope.launch {
+            activeApiUrlFlow.collect { url ->
+                activeApiUrl = url
+            }
+        }
     }
 
-    var activeApiUrl: String
-        get() = prefs.getString(KEY_ACTIVE_URL, DEFAULT_URLS.first()) ?: DEFAULT_URLS.first()
-        set(value) = prefs.edit().putString(KEY_ACTIVE_URL, value).apply()
-
-    var savedApiUrls: Set<String>
-        get() = prefs.getStringSet(KEY_URL_LIST, DEFAULT_URLS.toSet()) ?: DEFAULT_URLS.toSet()
-        set(value) = prefs.edit().putStringSet(KEY_URL_LIST, value).apply()
-
-    fun addApiUrl(url: String) {
-        val current = savedApiUrls.toMutableSet()
-        current.add(url)
-        savedApiUrls = current
-    }
-
-    companion object {
-        private const val KEY_ACTIVE_URL = "active_api_url"
-        private const val KEY_URL_LIST = "api_url_list"
-
-        val DEFAULT_URLS = listOf(
-            "http://100.97.27.128:5001",
-            "http://100.97.27.128:5002",
-            "http://100.78.149.91:5001",
-            "http://100.78.149.91:5002"
-
-        )
+    suspend fun saveApiUrl(url: String) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.ACTIVE_API_URL] = url
+        }
+        _refreshTrigger.tryEmit(Unit)
     }
 }

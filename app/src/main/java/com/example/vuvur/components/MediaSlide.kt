@@ -109,7 +109,7 @@ fun MediaSlide(
             if (file.type == "image") {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data("$activeApiUrl/api/preview/${file.path}")
+                        .data("$activeApiUrl/api/preview/${file.id}")
                         .crossfade(true)
                         .build(),
                     contentDescription = file.path,
@@ -127,7 +127,7 @@ fun MediaSlide(
                 val exoPlayer = remember {
                     ExoPlayer.Builder(context).build().apply {
                         val mediaItem =
-                            MediaItem.fromUri("$activeApiUrl/api/view/all/${file.path}")
+                            MediaItem.fromUri("$activeApiUrl/api/stream/${file.id}")
                         setMediaItem(mediaItem)
                         prepare()
                         playWhenReady = true

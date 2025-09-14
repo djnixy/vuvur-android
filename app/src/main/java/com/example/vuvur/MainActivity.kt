@@ -105,7 +105,7 @@ fun AppNavigation() {
         drawerState = drawerState,
         gesturesEnabled = gesturesEnabled,
         drawerContent = {
-            ModalDrawerSheet(modifier = Modifier.width(300.dp)) {
+            ModalDrawerSheet(modifier = Modifier.width(180.dp)) {
                 Spacer(Modifier.height(12.dp))
                 menuItems.forEach { screen ->
                     val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true

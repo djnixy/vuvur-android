@@ -1,12 +1,13 @@
 package com.example.vuvur
 
 data class MediaFile(
+    val id: Int,
     val path: String,
     val type: String,
     val width: Int,
     val height: Int,
     val mod_time: Double,
-    val exif: Map<String, Any>
+    val exif: Map<String, Any> = emptyMap()
 )
 
 data class PaginatedFileResponse(
@@ -17,7 +18,7 @@ data class PaginatedFileResponse(
 )
 
 data class ScanStatusResponse(
-    val status: String,
+    val scan_complete: Boolean,
     val progress: Int,
     val total: Int
 )
