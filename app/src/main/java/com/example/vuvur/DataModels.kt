@@ -31,7 +31,8 @@ data class CleanupResponse(
 )
 
 sealed interface GalleryUiState {
-    data object Loading : GalleryUiState
+    // ✅ Add apiUrl property to the Loading state
+    data class Loading(val apiUrl: String? = null) : GalleryUiState
     data class Scanning(val progress: Int, val total: Int) : GalleryUiState
     data class Error(val message: String) : GalleryUiState
     data class Success(

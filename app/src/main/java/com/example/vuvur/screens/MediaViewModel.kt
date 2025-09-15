@@ -19,10 +19,11 @@ import retrofit2.HttpException
 
 class MediaViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = (application as VuvurApplication).settingsRepository
-    private val apiService = ApiClient.createService(repository)
+    private val app = application as VuvurApplication
+    private val repository = app.settingsRepository
+    private var apiService = app.vuvurApiService
 
-    private val _uiState = MutableStateFlow<GalleryUiState>(GalleryUiState.Loading)
+    private val _uiState = MutableStateFlow<GalleryUiState>(GalleryUiState.Loading())
     val uiState = _uiState.asStateFlow()
 
     private var pollingJob: Job? = null
@@ -35,7 +36,13 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                 refresh()
             }
         }
-        // ✅ Simplified: No longer loads settings from API
+        // ✅ Listen for API changes and recreate the apiService
+        viewModelScope.launch {
+            repository.apiChanged.collectLatest { newApiUrl ->
+                apiService = app.apiClient.createService(newApiUrl)
+                refresh()
+            }
+        }
         loadPage(1, isNewSearch = true)
     }
 
@@ -45,14 +52,15 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
             if (currentState is GalleryUiState.Success && currentState.isLoadingNextPage) return@launch
             if (currentState is GalleryUiState.Success && page > currentState.totalPages) return@launch
 
+            val activeApiUrl = repository.activeApiUrlFlow.first()
+
             if (isNewSearch) {
-                _uiState.value = GalleryUiState.Loading
+                _uiState.value = GalleryUiState.Loading(activeApiUrl)
             } else if (currentState is GalleryUiState.Success) {
                 _uiState.value = currentState.copy(isLoadingNextPage = true)
             }
 
             try {
-                val activeApiUrl = repository.activeApiUrlFlow.first()
                 val response = apiService.getFiles(
                     sortBy = currentSort,
                     query = currentQuery,
@@ -118,7 +126,6 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ✅ Hard-coded zoom level
     fun getZoomLevel(): Float {
         return 2.5f
     }

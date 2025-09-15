@@ -3,12 +3,12 @@ package com.example.vuvur.screens
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.vuvur.ApiClient
 import com.example.vuvur.VuvurApplication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
@@ -20,8 +20,11 @@ data class SettingsUiState(
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = (application as VuvurApplication).settingsRepository
-    private val apiService = ApiClient.createService(repository)
+    // ✅ Get the application instance
+    private val app = application as VuvurApplication
+    private val repository = app.settingsRepository
+    // ✅ Get the apiService from the application instance
+    private var apiService = app.vuvurApiService
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState = _uiState.asStateFlow()
@@ -38,6 +41,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 )
             }.collect {
                 _uiState.value = it
+            }
+        }
+        // ✅ Listen for API changes and update the local apiService instance
+        viewModelScope.launch {
+            repository.apiChanged.collectLatest { newApiUrl ->
+                apiService = app.apiClient.createService(newApiUrl)
             }
         }
     }

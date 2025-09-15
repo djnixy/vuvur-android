@@ -54,8 +54,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             ) {
                 OutlinedTextField(
                     value = localActiveApi,
-                    onValueChange = { localActiveApi = it },
+                    // ✅ Set onValueChange to an empty lambda as the field is read-only
+                    onValueChange = {},
                     label = { Text("Active API URL") },
+                    // ✅ Make the text field read-only to prevent the keyboard
+                    readOnly = true,
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showApiDropdown) },
                     modifier = Modifier
                         .fillMaxWidth()

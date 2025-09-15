@@ -27,27 +27,28 @@ interface VuvurApiService {
     @GET("/api/random-single")
     suspend fun getRandomSingle(@Query("q") query: String): MediaFile
 
-    // ✅ Removed getSettings and saveSettings
-
     @POST("/api/cache/cleanup")
     suspend fun cleanCache(): CleanupResponse
 }
 
-object ApiClient {
-    private const val DUMMY_URL = "http://localhost/"
+class ApiClient(private val repository: SettingsRepository) {
 
-    fun createService(repository: SettingsRepository): VuvurApiService {
+    // ✅ Move DUMMY_URL to a companion object
+    companion object {
+        private const val DUMMY_URL = "http://localhost/"
+    }
 
+    fun createService(baseUrl: String): VuvurApiService {
         val interceptor = Interceptor { chain ->
-            val activeUrl = repository.activeApiUrl.toHttpUrl()
-            val newUrl = chain.request().url.newBuilder()
-                .scheme(activeUrl.scheme)
-                .host(activeUrl.host)
-                .port(activeUrl.port)
-                .build()
-
+            val newUrl = baseUrl.toHttpUrl()
             val request = chain.request().newBuilder()
-                .url(newUrl)
+                .url(
+                    chain.request().url.newBuilder()
+                        .scheme(newUrl.scheme)
+                        .host(newUrl.host)
+                        .port(newUrl.port)
+                        .build()
+                )
                 .build()
 
             chain.proceed(request)
