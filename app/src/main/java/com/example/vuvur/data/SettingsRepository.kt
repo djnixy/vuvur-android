@@ -28,10 +28,10 @@ class SettingsRepository(
 
     // ✅ Updated the default IP addresses
     private val DEFAULT_API_LIST = listOf(
-        "http://100.97.27.128:5001/",
-        "http://100.97.27.128:5002/",
-        "http://100.78.149.91:5001/",
-        "http://100.78.149.91:5002/"
+        "http://100.97.27.128:5001",
+        "http://100.97.27.128:7752",
+        "http://100.78.149.91:5001",
+        "http://100.78.149.91:5002"
     )
 
     var activeApiUrl: String = DEFAULT_API_LIST.first()
@@ -48,6 +48,9 @@ class SettingsRepository(
     private val _refreshTrigger = MutableSharedFlow<Unit>(replay = 1)
     val refreshTrigger = _refreshTrigger.asSharedFlow()
 
+    private val _apiChanged = MutableSharedFlow<String>()
+    val apiChanged = _apiChanged.asSharedFlow()
+
     init {
         scope.launch {
             activeApiUrlFlow.collect { url ->
@@ -60,6 +63,7 @@ class SettingsRepository(
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.ACTIVE_API_URL] = url
         }
+        _apiChanged.emit(url)
         _refreshTrigger.tryEmit(Unit)
     }
 }

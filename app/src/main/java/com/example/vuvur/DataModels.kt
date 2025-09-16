@@ -23,17 +23,7 @@ data class ScanStatusResponse(
     val total: Int
 )
 
-data class AppSettings(
-    val scan_interval: Int,
-    val batch_size: Int,
-    val preload_count: Int,
-    val zoom_level: Double
-)
-
-data class SettingsResponse(
-    val settings: AppSettings,
-    val locked_keys: List<String>
-)
+// ✅ Removed AppSettings and SettingsResponse
 
 data class CleanupResponse(
     val message: String,
@@ -41,7 +31,8 @@ data class CleanupResponse(
 )
 
 sealed interface GalleryUiState {
-    data object Loading : GalleryUiState
+    // ✅ Add apiUrl property to the Loading state
+    data class Loading(val apiUrl: String? = null) : GalleryUiState
     data class Scanning(val progress: Int, val total: Int) : GalleryUiState
     data class Error(val message: String) : GalleryUiState
     data class Success(

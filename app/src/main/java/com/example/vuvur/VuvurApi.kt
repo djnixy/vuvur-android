@@ -6,7 +6,6 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
@@ -28,32 +27,28 @@ interface VuvurApiService {
     @GET("/api/random-single")
     suspend fun getRandomSingle(@Query("q") query: String): MediaFile
 
-    @GET("/api/settings")
-    suspend fun getSettings(): SettingsResponse
-
-    @POST("/api/settings")
-    suspend fun saveSettings(@Body settings: AppSettings): AppSettings
-
     @POST("/api/cache/cleanup")
     suspend fun cleanCache(): CleanupResponse
 }
 
-object ApiClient {
-    private const val DUMMY_URL = "http://localhost/"
+class ApiClient(private val repository: SettingsRepository) {
 
-    fun createService(repository: SettingsRepository): VuvurApiService {
+    // ✅ Move DUMMY_URL to a companion object
+    companion object {
+        private const val DUMMY_URL = "http://localhost/"
+    }
 
+    fun createService(baseUrl: String): VuvurApiService {
         val interceptor = Interceptor { chain ->
-            // ✅ This line will now work correctly!
-            val activeUrl = repository.activeApiUrl.toHttpUrl()
-            val newUrl = chain.request().url.newBuilder()
-                .scheme(activeUrl.scheme)
-                .host(activeUrl.host)
-                .port(activeUrl.port)
-                .build()
-
+            val newUrl = baseUrl.toHttpUrl()
             val request = chain.request().newBuilder()
-                .url(newUrl)
+                .url(
+                    chain.request().url.newBuilder()
+                        .scheme(newUrl.scheme)
+                        .host(newUrl.host)
+                        .port(newUrl.port)
+                        .build()
+                )
                 .build()
 
             chain.proceed(request)
