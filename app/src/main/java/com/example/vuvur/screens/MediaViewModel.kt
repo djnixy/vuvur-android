@@ -36,7 +36,6 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                 refresh()
             }
         }
-        // ✅ Listen for API changes and recreate the apiService
         viewModelScope.launch {
             repository.apiChanged.collectLatest { newApiUrl ->
                 apiService = app.apiClient.createService(newApiUrl)
@@ -44,6 +43,17 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         loadPage(1, isNewSearch = true)
+    }
+
+    // ✅ Split the function into two for separate search and sort actions
+    fun applySearch(query: String) {
+        currentQuery = query
+        refresh()
+    }
+
+    fun applySort(sortBy: String) {
+        currentSort = sortBy
+        refresh()
     }
 
     fun loadPage(page: Int, isNewSearch: Boolean = false) {
