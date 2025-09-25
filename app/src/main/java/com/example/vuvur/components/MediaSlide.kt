@@ -109,7 +109,8 @@ fun MediaSlide(
             if (file.type == "image") {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data("$activeApiUrl/api/preview/${file.id}")
+                        // ✅ Use the /api/stream/ endpoint for full-size images
+                        .data("$activeApiUrl/api/stream/${file.id}")
                         .crossfade(true)
                         .build(),
                     contentDescription = file.path,
