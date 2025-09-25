@@ -28,7 +28,6 @@ data class CleanupResponse(
     val deleted_files: Int
 )
 
-// ✅ Add a data class for the delete response
 data class DeleteResponse(
     val status: String,
     val message: String
@@ -43,6 +42,8 @@ sealed interface GalleryUiState {
         val totalPages: Int = 1,
         val currentPage: Int = 1,
         val isLoadingNextPage: Boolean = false,
-        val activeApiUrl: String
+        val activeApiUrl: String,
+        // ✅ Add zoom level to the Success state
+        val zoomLevel: Float = 2.5f
     ) : GalleryUiState
 }

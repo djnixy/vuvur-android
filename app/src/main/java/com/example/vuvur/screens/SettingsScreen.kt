@@ -3,6 +3,7 @@ package com.example.vuvur.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,6 +18,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -32,13 +34,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsState()
     var showApiDropdown by remember { mutableStateOf(false) }
-    // ✅ State for the confirmation dialog
     var showClearCacheDialog by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -51,7 +53,6 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         }
     }
 
-    // ✅ Confirmation Dialog
     if (showClearCacheDialog) {
         AlertDialog(
             onDismissRequest = { showClearCacheDialog = false },
@@ -83,7 +84,6 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             return@Scaffold
         }
 
-        // ✅ Use a Box to position the button at the bottom
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -127,9 +127,25 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         }
                     }
                 }
+
+                Text("Double-Tap Zoom Level", style = MaterialTheme.typography.titleMedium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Slider(
+                        value = state.zoomLevel,
+                        onValueChange = { viewModel.saveZoomLevel(it) },
+                        // ✅ Change valueRange to start from 2f
+                        valueRange = 2f..5f,
+                        // ✅ Adjust steps for 0.5 increments
+                        steps = 5,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "${(state.zoomLevel * 10).roundToInt() / 10f}x",
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
+                }
             }
 
-            // ✅ Moved Button to the bottom of the screen
             Button(
                 onClick = { showClearCacheDialog = true },
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),

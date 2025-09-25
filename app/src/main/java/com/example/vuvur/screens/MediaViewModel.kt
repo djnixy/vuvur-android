@@ -41,6 +41,18 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                 refresh()
             }
         }
+        // ✅ Listen for zoom level changes and update the state
+        viewModelScope.launch {
+            repository.zoomChanged.collect { newZoomLevel ->
+                _uiState.update { currentState ->
+                    if (currentState is GalleryUiState.Success) {
+                        currentState.copy(zoomLevel = newZoomLevel)
+                    } else {
+                        currentState
+                    }
+                }
+            }
+        }
         loadPage(1, isNewSearch = true)
     }
 
@@ -54,12 +66,10 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
         refresh()
     }
 
-    // ✅ Add a function to delete a media item
     fun deleteMediaItem(mediaId: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 apiService.deleteMediaItem(mediaId)
-                // ✅ Update the UI by removing the deleted item
                 _uiState.update {
                     if (it is GalleryUiState.Success) {
                         it.copy(files = it.files.filterNot { file -> file.id == mediaId })
@@ -80,6 +90,7 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
             if (currentState is GalleryUiState.Success && page > currentState.totalPages) return@launch
 
             val activeApiUrl = repository.activeApiUrlFlow.first()
+            val zoomLevel = repository.zoomLevelFlow.first()
 
             if (isNewSearch) {
                 _uiState.value = GalleryUiState.Loading(activeApiUrl)
@@ -106,7 +117,8 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                         totalPages = response.total_pages,
                         currentPage = response.page,
                         isLoadingNextPage = false,
-                        activeApiUrl = activeApiUrl
+                        activeApiUrl = activeApiUrl,
+                        zoomLevel = zoomLevel
                     )
                 }
             } catch (e: HttpException) {
@@ -151,10 +163,6 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
-    }
-
-    fun getZoomLevel(): Float {
-        return 2.5f
     }
 
     fun refresh() {

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -24,9 +25,9 @@ class SettingsRepository(
     private object PreferencesKeys {
         val ACTIVE_API_URL = stringPreferencesKey("active_api_url")
         val API_LIST = stringSetPreferencesKey("api_list")
+        val ZOOM_LEVEL = floatPreferencesKey("zoom_level")
     }
 
-    // ✅ Updated the default IP addresses
     private val DEFAULT_API_LIST = listOf(
         "http://100.97.27.128:5001",
         "http://100.97.27.128:7752",
@@ -45,11 +46,19 @@ class SettingsRepository(
         preferences[PreferencesKeys.API_LIST]?.toList()?.takeIf { it.isNotEmpty() } ?: DEFAULT_API_LIST
     }
 
+    val zoomLevelFlow: Flow<Float> = dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.ZOOM_LEVEL] ?: 2.5f
+    }
+
     private val _refreshTrigger = MutableSharedFlow<Unit>(replay = 1)
     val refreshTrigger = _refreshTrigger.asSharedFlow()
 
     private val _apiChanged = MutableSharedFlow<String>()
     val apiChanged = _apiChanged.asSharedFlow()
+
+    // ✅ Add a flow to notify when the zoom level has changed
+    private val _zoomChanged = MutableSharedFlow<Float>()
+    val zoomChanged = _zoomChanged.asSharedFlow()
 
     init {
         scope.launch {
@@ -65,5 +74,13 @@ class SettingsRepository(
         }
         _apiChanged.emit(url)
         _refreshTrigger.tryEmit(Unit)
+    }
+
+    suspend fun saveZoomLevel(level: Float) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.ZOOM_LEVEL] = level
+        }
+        // ✅ Emit the new zoom level
+        _zoomChanged.emit(level)
     }
 }

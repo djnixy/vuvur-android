@@ -13,13 +13,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import com.example.vuvur.MediaFile
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import androidx.compose.runtime.DisposableEffect
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.example.vuvur.MediaFile
 
 @Composable
 fun MediaSlide(
@@ -27,13 +26,15 @@ fun MediaSlide(
     activeApiUrl: String,
     onNextImage: () -> Unit,
     onPreviousImage: () -> Unit,
-    allowSwipeNavigation: Boolean = true // true for Random/Main pages, false for Single mode
+    allowSwipeNavigation: Boolean = true,
+    // ✅ Add zoom level as a parameter
+    doubleTapZoomLevel: Float = 2.5f
 ) {
     val context = LocalContext.current
 
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
+    var scale by remember { mutableStateOf(1f) }
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
 
     // Reset zoom/pan when file changes
     LaunchedEffect(file) {
@@ -66,7 +67,6 @@ fun MediaSlide(
             }
         }
 
-        // Only attach drag gestures for pan when zoomed in
         val dragModifier = if (scale > 1f) {
             Modifier.pointerInput(scale) {
                 detectDragGestures { change, dragAmount ->
@@ -74,12 +74,11 @@ fun MediaSlide(
                     val (mx, my) = maxOffsets(scale)
                     offsetX = (offsetX + dx).coerceIn(-mx, mx)
                     offsetY = (offsetY + dy).coerceIn(-my, my)
-                    change.consume() // only consume when zoomed in
+                    change.consume()
                 }
             }
         } else Modifier
 
-        // Gesture handling
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -88,7 +87,8 @@ fun MediaSlide(
                         onDoubleTap = { tapOffset ->
                             if (file.type == "image") {
                                 if (scale <= 1f) {
-                                    val targetScale = 2f
+                                    // ✅ Use the passed-in zoom level
+                                    val targetScale = doubleTapZoomLevel
                                     val tx = (containerWidth / 2f - tapOffset.x) * (targetScale - 1f)
                                     val ty = (containerHeight / 2f - tapOffset.y) * (targetScale - 1f)
                                     scale = targetScale
@@ -104,12 +104,11 @@ fun MediaSlide(
                         }
                     )
                 }
-                .then(dragModifier) // attach pan only when zoomed in
+                .then(dragModifier)
         ) {
             if (file.type == "image") {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        // ✅ Use the /api/stream/ endpoint for full-size images
                         .data("$activeApiUrl/api/stream/${file.id}")
                         .crossfade(true)
                         .build(),
