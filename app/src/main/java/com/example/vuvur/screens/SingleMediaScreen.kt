@@ -20,7 +20,6 @@ fun SingleMediaScreen(
     val state by viewModel.uiState.collectAsState()
     var isZoomed by remember { mutableStateOf(false) }
     var currentIndex by remember { mutableStateOf(0) }
-    val zoomLevel = viewModel.getZoomLevel()
 
     // Reset zoom when switching images
     LaunchedEffect(currentIndex) {
@@ -57,10 +56,11 @@ fun SingleMediaScreen(
                             activeApiUrl = currentState.activeApiUrl,
                             onNextImage = { currentIndex++ },
                             onPreviousImage = { currentIndex-- },
-                            allowSwipeNavigation = false // disables vertical swipe
+                            allowSwipeNavigation = false, // disables vertical swipe
+                            // ✅ Pass the zoom level from the state
+                            doubleTapZoomLevel = currentState.zoomLevel
                         )
 
-                        // Floating "Next" button
                         // Floating "Next" button (circle only, no text)
                         if (!isZoomed && validIndex < currentState.files.size - 1) {
                             IconButton(

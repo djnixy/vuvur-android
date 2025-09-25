@@ -29,7 +29,6 @@ fun RandomScreen(
     val state by viewModel.uiState.collectAsState()
     var zoomedPageIndex by remember { mutableStateOf(-1) }
     val isPagerScrollEnabled = zoomedPageIndex == -1
-    val zoomLevel = viewModel.getZoomLevel()
 
     Box(modifier = Modifier.fillMaxSize()) {
         when (val currentState = state) {
@@ -66,7 +65,9 @@ fun RandomScreen(
                         activeApiUrl = currentState.activeApiUrl,
                         onNextImage = { /* go to next media */ },
                         onPreviousImage = { /* go to previous media */ },
-                        allowSwipeNavigation = true // enables vertical swipe
+                        allowSwipeNavigation = true, // enables vertical swipe
+                        // ✅ Pass the zoom level from the state
+                        doubleTapZoomLevel = currentState.zoomLevel
                     )
                 }
             }

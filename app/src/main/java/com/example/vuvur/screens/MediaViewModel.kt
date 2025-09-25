@@ -3,8 +3,6 @@ package com.example.vuvur.screens
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.vuvur.ApiClient
-import com.example.vuvur.AppSettings
 import com.example.vuvur.GalleryUiState
 import com.example.vuvur.VuvurApplication
 import kotlinx.coroutines.Dispatchers
@@ -20,13 +18,13 @@ import retrofit2.HttpException
 
 class MediaViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository = (application as VuvurApplication).settingsRepository
-    private val apiService = ApiClient.createService(repository)
+    private val app = application as VuvurApplication
+    private val repository = app.settingsRepository
+    private var apiService = app.vuvurApiService
 
-    private val _uiState = MutableStateFlow<GalleryUiState>(GalleryUiState.Loading)
+    private val _uiState = MutableStateFlow<GalleryUiState>(GalleryUiState.Loading())
     val uiState = _uiState.asStateFlow()
 
-    private var appSettings: AppSettings? = null
     private var pollingJob: Job? = null
     private var currentSort = "random"
     private var currentQuery = ""
@@ -37,37 +35,70 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                 refresh()
             }
         }
-        loadSettingsAndFiles()
+        viewModelScope.launch {
+            repository.apiChanged.collectLatest { newApiUrl ->
+                apiService = app.apiClient.createService(newApiUrl)
+                refresh()
+            }
+        }
+        // ✅ Listen for zoom level changes and update the state
+        viewModelScope.launch {
+            repository.zoomChanged.collect { newZoomLevel ->
+                _uiState.update { currentState ->
+                    if (currentState is GalleryUiState.Success) {
+                        currentState.copy(zoomLevel = newZoomLevel)
+                    } else {
+                        currentState
+                    }
+                }
+            }
+        }
+        loadPage(1, isNewSearch = true)
     }
 
-    private fun loadSettings() {
+    fun applySearch(query: String) {
+        currentQuery = query
+        refresh()
+    }
+
+    fun applySort(sortBy: String) {
+        currentSort = sortBy
+        refresh()
+    }
+
+    fun deleteMediaItem(mediaId: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                if (appSettings == null) {
-                    appSettings = apiService.getSettings().settings
+                apiService.deleteMediaItem(mediaId)
+                _uiState.update {
+                    if (it is GalleryUiState.Success) {
+                        it.copy(files = it.files.filterNot { file -> file.id == mediaId })
+                    } else {
+                        it
+                    }
                 }
             } catch (e: Exception) {
-                // failed, will use default
+                // Handle error
             }
         }
     }
 
     fun loadPage(page: Int, isNewSearch: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
-            if (appSettings == null) { loadSettings() }
-
             val currentState = _uiState.value
             if (currentState is GalleryUiState.Success && currentState.isLoadingNextPage) return@launch
             if (currentState is GalleryUiState.Success && page > currentState.totalPages) return@launch
 
+            val activeApiUrl = repository.activeApiUrlFlow.first()
+            val zoomLevel = repository.zoomLevelFlow.first()
+
             if (isNewSearch) {
-                _uiState.value = GalleryUiState.Loading
+                _uiState.value = GalleryUiState.Loading(activeApiUrl)
             } else if (currentState is GalleryUiState.Success) {
                 _uiState.value = currentState.copy(isLoadingNextPage = true)
             }
 
             try {
-                val activeApiUrl = repository.activeApiUrlFlow.first()
                 val response = apiService.getFiles(
                     sortBy = currentSort,
                     query = currentQuery,
@@ -79,7 +110,6 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                     } else {
                         it.files
                     }
-                    // ✅ FIX: Filter out duplicate items before adding them to the list
                     val newItems = response.items.filter { newItem -> currentFiles.none { it.id == newItem.id } }
 
                     GalleryUiState.Success(
@@ -87,7 +117,8 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                         totalPages = response.total_pages,
                         currentPage = response.page,
                         isLoadingNextPage = false,
-                        activeApiUrl = activeApiUrl
+                        activeApiUrl = activeApiUrl,
+                        zoomLevel = zoomLevel
                     )
                 }
             } catch (e: HttpException) {
@@ -131,17 +162,6 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                     // continue polling
                 }
             }
-        }
-    }
-
-    fun getZoomLevel(): Float {
-        return appSettings?.zoom_level?.toFloat() ?: 2.5f
-    }
-
-    fun loadSettingsAndFiles() {
-        viewModelScope.launch {
-            loadSettings()
-            loadPage(1, isNewSearch = true)
         }
     }
 

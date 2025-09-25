@@ -25,16 +25,22 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp // ✅ Import for sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -101,6 +107,17 @@ fun AppNavigation() {
     val isFullscreen = route == Screen.Random.route || route == Screen.Single.route || route?.startsWith("viewer") == true
     val gesturesEnabled = !isFullscreen
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val uiState by mediaViewModel.uiState.collectAsState()
+
+    LaunchedEffect(uiState) {
+        if (uiState is GalleryUiState.Loading) {
+            (uiState as GalleryUiState.Loading).apiUrl?.let { url ->
+                snackbarHostState.showSnackbar("Connecting to $url...")
+            }
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = gesturesEnabled,
@@ -128,6 +145,7 @@ fun AppNavigation() {
         }
     ) {
         Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 if (!isFullscreen) {
                     TopAppBar(
@@ -135,7 +153,16 @@ fun AppNavigation() {
                             val currentTitle = menuItems.find { item ->
                                 currentDestination?.hierarchy?.any { it.route == item.route } == true
                             }?.label ?: "Vuvur"
-                            Text(currentTitle)
+                            val activeApiUrl = when (val state = uiState) {
+                                is GalleryUiState.Success -> state.activeApiUrl
+                                is GalleryUiState.Loading -> state.apiUrl ?: ""
+                                else -> ""
+                            }
+                            // ✅ Add the fontSize parameter here
+                            Text(
+                                text = "$currentTitle - $activeApiUrl",
+                                fontSize = 18.sp
+                            )
                         },
                         navigationIcon = {
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {

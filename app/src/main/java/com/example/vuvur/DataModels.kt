@@ -23,25 +23,18 @@ data class ScanStatusResponse(
     val total: Int
 )
 
-data class AppSettings(
-    val scan_interval: Int,
-    val batch_size: Int,
-    val preload_count: Int,
-    val zoom_level: Double
-)
-
-data class SettingsResponse(
-    val settings: AppSettings,
-    val locked_keys: List<String>
-)
-
 data class CleanupResponse(
     val message: String,
     val deleted_files: Int
 )
 
+data class DeleteResponse(
+    val status: String,
+    val message: String
+)
+
 sealed interface GalleryUiState {
-    data object Loading : GalleryUiState
+    data class Loading(val apiUrl: String? = null) : GalleryUiState
     data class Scanning(val progress: Int, val total: Int) : GalleryUiState
     data class Error(val message: String) : GalleryUiState
     data class Success(
@@ -49,6 +42,8 @@ sealed interface GalleryUiState {
         val totalPages: Int = 1,
         val currentPage: Int = 1,
         val isLoadingNextPage: Boolean = false,
-        val activeApiUrl: String
+        val activeApiUrl: String,
+        // ✅ Add zoom level to the Success state
+        val zoomLevel: Float = 2.5f
     ) : GalleryUiState
 }
