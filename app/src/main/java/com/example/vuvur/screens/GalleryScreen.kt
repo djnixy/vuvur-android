@@ -16,7 +16,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -26,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,47 +66,70 @@ fun GalleryScreen(
         "date_desc" to "Date Descending"
     )
     var selectedSort by remember { mutableStateOf("random") }
-
-    // ✅ Get the focus manager to control the keyboard
     val focusManager = LocalFocusManager.current
 
+    // ✅ State to control the delete confirmation dialog
+    var showDeleteDialog by remember { mutableStateOf<Int?>(null) }
+
+    if (showDeleteDialog != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = null },
+            title = { Text("Delete File") },
+            text = { Text("Are you sure you want to move this file to the recycle bin?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog?.let { viewModel.deleteMediaItem(it) }
+                        showDeleteDialog = null
+                    }
+                ) {
+                    Text("Confirm")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Column {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                label = { Text("Search using tags") },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                trailingIcon = {
-                    IconButton(onClick = {
-                        viewModel.applySearch(searchQuery)
-                        // Hide keyboard on search
-                        focusManager.clearFocus()
-                    }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search by tags")
-                    }
-                },
-                // ✅ Add a search button to the keyboard
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                // ✅ Trigger search when the keyboard search button is pressed
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        viewModel.applySearch(searchQuery)
-                        focusManager.clearFocus()
-                    }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Search using tags") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    leadingIcon = {
+                        IconButton(onClick = {
+                            viewModel.applySearch(searchQuery)
+                            focusManager.clearFocus()
+                        }) {
+                            Icon(Icons.Default.Search, contentDescription = "Search by tags")
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            viewModel.applySearch(searchQuery)
+                            focusManager.clearFocus()
+                        }
+                    )
                 )
-            )
 
-            Box {
                 IconButton(onClick = { sortMenuExpanded = true }) {
                     Icon(Icons.Default.ArrowDropDown, contentDescription = "Sort Options")
                 }
+            }
+
+            Box(modifier = Modifier.align(Alignment.TopEnd)) {
                 DropdownMenu(
                     expanded = sortMenuExpanded,
                     onDismissRequest = { sortMenuExpanded = false }
@@ -111,13 +137,9 @@ fun GalleryScreen(
                     sortOptions.forEach { (key, value) ->
                         DropdownMenuItem(
                             text = { Text(value) },
-                            onClick = {
-                                selectedSort = key
-                                sortMenuExpanded = false
-                            }
+                            onClick = { selectedSort = key }
                         )
                     }
-                    // ✅ Move "Apply Sort" button inside the dropdown menu
                     Box(modifier = Modifier.padding(8.dp)) {
                         Button(
                             onClick = {
@@ -126,7 +148,7 @@ fun GalleryScreen(
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Apply Sort")
+                            Text("Apply")
                         }
                     }
                 }
@@ -144,6 +166,7 @@ fun GalleryScreen(
                             CircularProgressIndicator()
                         }
                     }
+
                     is GalleryUiState.Error -> Text("Failed to load: ${currentState.message}")
                     is GalleryUiState.Scanning -> Text("Scanning Library: ${currentState.progress} / ${currentState.total}")
                     is GalleryUiState.Success -> {
@@ -153,7 +176,9 @@ fun GalleryScreen(
                             onScrolledToEnd = {
                                 viewModel.loadPage(currentState.currentPage + 1)
                             },
-                            onImageClick = onImageClick
+                            onImageClick = onImageClick,
+                            // ✅ Pass a lambda to handle delete clicks
+                            onDeleteClick = { fileId -> showDeleteDialog = fileId }
                         )
                     }
                 }
@@ -167,7 +192,9 @@ fun GalleryGrid(
     files: List<MediaFile>,
     activeApiUrl: String,
     onScrolledToEnd: () -> Unit,
-    onImageClick: (Int) -> Unit
+    onImageClick: (Int) -> Unit,
+    // ✅ Receive a lambda for delete clicks
+    onDeleteClick: (Int) -> Unit
 ) {
     LazyVerticalStaggeredGrid(
         columns = StaggeredGridCells.Adaptive(150.dp),
@@ -183,7 +210,9 @@ fun GalleryGrid(
             MediaThumbnail(
                 file = file,
                 activeApiUrl = activeApiUrl,
-                onClick = { onImageClick(index) }
+                onClick = { onImageClick(index) },
+                // ✅ Pass the file ID to the delete click handler
+                onDeleteClick = { onDeleteClick(file.id) }
             )
         }
     }
@@ -193,20 +222,37 @@ fun GalleryGrid(
 fun MediaThumbnail(
     file: MediaFile,
     activeApiUrl: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    // ✅ Receive a lambda for the delete action
+    onDeleteClick: () -> Unit
 ) {
     val thumbnailUrl = "$activeApiUrl/api/thumbnails/${file.id}"
     val aspectRatio = if (file.height > 0 && file.width > 0) {
         file.width.toFloat() / file.height.toFloat()
-    } else { 1.0f }
+    } else {
+        1.0f
+    }
 
-    AsyncImage(
-        model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).crossfade(true).build(),
-        contentDescription = file.path,
+    // ✅ Wrap in a Box to overlay the delete icon
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .aspectRatio(aspectRatio)
-            .clickable { onClick() },
-        contentScale = ContentScale.Crop
-    )
+            .clickable { onClick() }
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current).data(thumbnailUrl).crossfade(true)
+                .build(),
+            contentDescription = file.path,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        // ✅ Add the delete icon button
+        IconButton(
+            onClick = onDeleteClick,
+            modifier = Modifier.align(Alignment.TopEnd)
+        ) {
+            Icon(Icons.Default.Delete, contentDescription = "Delete")
+        }
+    }
 }

@@ -3,7 +3,6 @@ package com.example.vuvur.screens
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.vuvur.ApiClient
 import com.example.vuvur.GalleryUiState
 import com.example.vuvur.VuvurApplication
 import kotlinx.coroutines.Dispatchers
@@ -45,7 +44,6 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
         loadPage(1, isNewSearch = true)
     }
 
-    // ✅ Split the function into two for separate search and sort actions
     fun applySearch(query: String) {
         currentQuery = query
         refresh()
@@ -54,6 +52,25 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
     fun applySort(sortBy: String) {
         currentSort = sortBy
         refresh()
+    }
+
+    // ✅ Add a function to delete a media item
+    fun deleteMediaItem(mediaId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                apiService.deleteMediaItem(mediaId)
+                // ✅ Update the UI by removing the deleted item
+                _uiState.update {
+                    if (it is GalleryUiState.Success) {
+                        it.copy(files = it.files.filterNot { file -> file.id == mediaId })
+                    } else {
+                        it
+                    }
+                }
+            } catch (e: Exception) {
+                // Handle error
+            }
+        }
     }
 
     fun loadPage(page: Int, isNewSearch: Boolean = false) {

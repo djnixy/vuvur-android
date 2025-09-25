@@ -23,15 +23,18 @@ data class ScanStatusResponse(
     val total: Int
 )
 
-// ✅ Removed AppSettings and SettingsResponse
-
 data class CleanupResponse(
     val message: String,
     val deleted_files: Int
 )
 
+// ✅ Add a data class for the delete response
+data class DeleteResponse(
+    val status: String,
+    val message: String
+)
+
 sealed interface GalleryUiState {
-    // ✅ Add apiUrl property to the Loading state
     data class Loading(val apiUrl: String? = null) : GalleryUiState
     data class Scanning(val progress: Int, val total: Int) : GalleryUiState
     data class Error(val message: String) : GalleryUiState

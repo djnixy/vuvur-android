@@ -8,6 +8,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface VuvurApiService {
@@ -29,11 +30,14 @@ interface VuvurApiService {
 
     @POST("/api/cache/cleanup")
     suspend fun cleanCache(): CleanupResponse
+
+    // ✅ Add the delete endpoint
+    @POST("/api/delete/{id}")
+    suspend fun deleteMediaItem(@Path("id") mediaId: Int): DeleteResponse
 }
 
 class ApiClient(private val repository: SettingsRepository) {
 
-    // ✅ Move DUMMY_URL to a companion object
     companion object {
         private const val DUMMY_URL = "http://localhost/"
     }
