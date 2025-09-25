@@ -40,6 +40,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp // ✅ Import for sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -110,7 +111,6 @@ fun AppNavigation() {
     val uiState by mediaViewModel.uiState.collectAsState()
 
     LaunchedEffect(uiState) {
-        // ✅ Read the URL from the Loading state for the snackbar
         if (uiState is GalleryUiState.Loading) {
             (uiState as GalleryUiState.Loading).apiUrl?.let { url ->
                 snackbarHostState.showSnackbar("Connecting to $url...")
@@ -153,13 +153,16 @@ fun AppNavigation() {
                             val currentTitle = menuItems.find { item ->
                                 currentDestination?.hierarchy?.any { it.route == item.route } == true
                             }?.label ?: "Vuvur"
-                            // ✅ Show URL from either Success or Loading state
                             val activeApiUrl = when (val state = uiState) {
                                 is GalleryUiState.Success -> state.activeApiUrl
                                 is GalleryUiState.Loading -> state.apiUrl ?: ""
                                 else -> ""
                             }
-                            Text("$currentTitle - $activeApiUrl")
+                            // ✅ Add the fontSize parameter here
+                            Text(
+                                text = "$currentTitle - $activeApiUrl",
+                                fontSize = 18.sp
+                            )
                         },
                         navigationIcon = {
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {

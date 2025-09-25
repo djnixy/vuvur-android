@@ -1,10 +1,33 @@
 package com.example.vuvur.screens
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -14,10 +37,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsState()
-    var localActiveApi by remember(state.activeApi) {
-        mutableStateOf(state.activeApi)
-    }
     var showApiDropdown by remember { mutableStateOf(false) }
+    // ✅ State for the confirmation dialog
+    var showClearCacheDialog by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -29,6 +51,30 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         }
     }
 
+    // ✅ Confirmation Dialog
+    if (showClearCacheDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearCacheDialog = false },
+            title = { Text("Confirm Clear Cache") },
+            text = { Text("Are you sure you want to clear all caches and re-scan? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.runCacheCleanup()
+                        showClearCacheDialog = false
+                    }
+                ) {
+                    Text("Confirm")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearCacheDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
         if (state.isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -37,59 +83,61 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             return@Scaffold
         }
 
-        Column(
+        // ✅ Use a Box to position the button at the bottom
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-
-            Text("API Endpoint", style = MaterialTheme.typography.titleMedium)
-
-            ExposedDropdownMenuBox(
-                expanded = showApiDropdown,
-                onExpandedChange = { showApiDropdown = !showApiDropdown }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                OutlinedTextField(
-                    value = localActiveApi,
-                    // ✅ Set onValueChange to an empty lambda as the field is read-only
-                    onValueChange = {},
-                    label = { Text("Active API URL") },
-                    // ✅ Make the text field read-only to prevent the keyboard
-                    readOnly = true,
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showApiDropdown) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor()
-                )
-                ExposedDropdownMenu(
+
+                Text("API Endpoint", style = MaterialTheme.typography.titleMedium)
+
+                ExposedDropdownMenuBox(
                     expanded = showApiDropdown,
-                    onDismissRequest = { showApiDropdown = false }
+                    onExpandedChange = { showApiDropdown = !showApiDropdown }
                 ) {
-                    state.apiList.forEach { apiUrl ->
-                        DropdownMenuItem(
-                            text = { Text(apiUrl) },
-                            onClick = {
-                                localActiveApi = apiUrl
-                                showApiDropdown = false
-                            }
-                        )
+                    OutlinedTextField(
+                        value = state.activeApi,
+                        onValueChange = {},
+                        label = { Text("Active API URL") },
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showApiDropdown) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = showApiDropdown,
+                        onDismissRequest = { showApiDropdown = false }
+                    ) {
+                        state.apiList.forEach { apiUrl ->
+                            DropdownMenuItem(
+                                text = { Text(apiUrl) },
+                                onClick = {
+                                    viewModel.saveSettings(apiUrl)
+                                    showApiDropdown = false
+                                }
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            // ✅ Simplified save button
-            Button(onClick = { viewModel.saveSettings(localActiveApi) }) {
-                Text("Save")
-            }
-
-            Divider(modifier = Modifier.padding(vertical = 16.dp))
-
-            Button(onClick = { viewModel.runCacheCleanup() }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+            // ✅ Moved Button to the bottom of the screen
+            Button(
+                onClick = { showClearCacheDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+                    .fillMaxWidth()
+            ) {
                 Text("Clear All Caches & Re-Scan")
             }
         }

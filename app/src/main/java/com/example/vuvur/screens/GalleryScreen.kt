@@ -19,7 +19,6 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -62,13 +61,11 @@ fun GalleryScreen(
     var sortMenuExpanded by remember { mutableStateOf(false) }
     val sortOptions = mapOf(
         "random" to "Random",
-        "date_asc" to "Date Ascending",
-        "date_desc" to "Date Descending"
+        "date_asc" to "Older first",
+        "date_desc" to "Newest first"
     )
-    var selectedSort by remember { mutableStateOf("random") }
     val focusManager = LocalFocusManager.current
 
-    // ✅ State to control the delete confirmation dialog
     var showDeleteDialog by remember { mutableStateOf<Int?>(null) }
 
     if (showDeleteDialog != null) {
@@ -98,7 +95,7 @@ fun GalleryScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .padding(horizontal = 8.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
@@ -137,19 +134,11 @@ fun GalleryScreen(
                     sortOptions.forEach { (key, value) ->
                         DropdownMenuItem(
                             text = { Text(value) },
-                            onClick = { selectedSort = key }
-                        )
-                    }
-                    Box(modifier = Modifier.padding(8.dp)) {
-                        Button(
                             onClick = {
-                                viewModel.applySort(selectedSort)
+                                viewModel.applySort(key)
                                 sortMenuExpanded = false
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Apply")
-                        }
+                            }
+                        )
                     }
                 }
             }
@@ -160,26 +149,28 @@ fun GalleryScreen(
             onRefresh = { viewModel.refresh() }
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                // ✅ Refactored logic to correctly handle UI states and fix the warning
                 when (val currentState = state) {
-                    is GalleryUiState.Loading -> {
-                        if ((viewModel.uiState.value as? GalleryUiState.Success)?.files.isNullOrEmpty()) {
-                            CircularProgressIndicator()
+                    is GalleryUiState.Success -> {
+                        if (currentState.files.isEmpty()) {
+                            Text("No media found.")
+                        } else {
+                            GalleryGrid(
+                                files = currentState.files,
+                                activeApiUrl = currentState.activeApiUrl,
+                                onScrolledToEnd = {
+                                    viewModel.loadPage(currentState.currentPage + 1)
+                                },
+                                onImageClick = onImageClick,
+                                onDeleteClick = { fileId -> showDeleteDialog = fileId }
+                            )
                         }
                     }
-
                     is GalleryUiState.Error -> Text("Failed to load: ${currentState.message}")
                     is GalleryUiState.Scanning -> Text("Scanning Library: ${currentState.progress} / ${currentState.total}")
-                    is GalleryUiState.Success -> {
-                        GalleryGrid(
-                            files = currentState.files,
-                            activeApiUrl = currentState.activeApiUrl,
-                            onScrolledToEnd = {
-                                viewModel.loadPage(currentState.currentPage + 1)
-                            },
-                            onImageClick = onImageClick,
-                            // ✅ Pass a lambda to handle delete clicks
-                            onDeleteClick = { fileId -> showDeleteDialog = fileId }
-                        )
+                    is GalleryUiState.Loading -> {
+                        // Show the centered indicator only on initial load when the screen is empty
+                        CircularProgressIndicator()
                     }
                 }
             }
@@ -193,7 +184,6 @@ fun GalleryGrid(
     activeApiUrl: String,
     onScrolledToEnd: () -> Unit,
     onImageClick: (Int) -> Unit,
-    // ✅ Receive a lambda for delete clicks
     onDeleteClick: (Int) -> Unit
 ) {
     LazyVerticalStaggeredGrid(
@@ -211,7 +201,6 @@ fun GalleryGrid(
                 file = file,
                 activeApiUrl = activeApiUrl,
                 onClick = { onImageClick(index) },
-                // ✅ Pass the file ID to the delete click handler
                 onDeleteClick = { onDeleteClick(file.id) }
             )
         }
@@ -223,7 +212,6 @@ fun MediaThumbnail(
     file: MediaFile,
     activeApiUrl: String,
     onClick: () -> Unit,
-    // ✅ Receive a lambda for the delete action
     onDeleteClick: () -> Unit
 ) {
     val thumbnailUrl = "$activeApiUrl/api/thumbnails/${file.id}"
@@ -233,7 +221,6 @@ fun MediaThumbnail(
         1.0f
     }
 
-    // ✅ Wrap in a Box to overlay the delete icon
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -247,7 +234,6 @@ fun MediaThumbnail(
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
-        // ✅ Add the delete icon button
         IconButton(
             onClick = onDeleteClick,
             modifier = Modifier.align(Alignment.TopEnd)
