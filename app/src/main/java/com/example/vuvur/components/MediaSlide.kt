@@ -14,6 +14,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
@@ -129,6 +130,7 @@ fun MediaSlide(
                         val mediaItem =
                             MediaItem.fromUri("$activeApiUrl/api/stream/${file.id}")
                         setMediaItem(mediaItem)
+                        repeatMode = Player.REPEAT_MODE_ONE
                         prepare()
                         playWhenReady = true
                     }
