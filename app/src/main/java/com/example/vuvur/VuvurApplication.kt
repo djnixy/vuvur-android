@@ -1,21 +1,14 @@
 package com.example.vuvur
 
 import android.app.Application
-import android.content.Context
-import android.os.Build.VERSION.SDK_INT // Import SDK_INT
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.preferencesDataStore
-import coil.ImageLoader // Import ImageLoader
-import coil.ImageLoaderFactory // Import ImageLoaderFactory
-import coil.decode.GifDecoder // Import GifDecoder
-import coil.decode.ImageDecoderDecoder // Import ImageDecoderDecoder
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.decode.ImageDecoderDecoder
 import com.example.vuvur.data.SettingsRepository
-import com.example.vuvur.data.dataStore // Import top-level dataStore definition
+import com.example.vuvur.data.dataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 // Define the CoroutineScope at the application level
@@ -37,7 +30,6 @@ class VuvurApplication : Application(), ImageLoaderFactory {
         // Initialize ApiService asynchronously
         applicationScope.launch {
             // Fetch initial URL using the suspend function from the initialized repository
-            // Make sure getActiveApiUrl exists and is a suspend function in SettingsRepository
             val activeUrl = settingsRepository.getActiveApiUrl()
             vuvurApiService = apiClient.createService(activeUrl)
         }
@@ -47,12 +39,9 @@ class VuvurApplication : Application(), ImageLoaderFactory {
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
             .components {
-                // Add the correct decoder based on SDK version
-                if (SDK_INT >= 28) {
-                    add(ImageDecoderDecoder.Factory()) // Handles GIFs and more on API 28+
-                } else {
-                    add(GifDecoder.Factory()) // Fallback for older APIs
-                }
+                // ✅ Remove the SDK_INT check, always use ImageDecoderDecoder
+                // Since minSdk is 33, SDK_INT will always be >= 28.
+                add(ImageDecoderDecoder.Factory())
             }
             .crossfade(true) // Optional: for smooth image loading
             .build()
