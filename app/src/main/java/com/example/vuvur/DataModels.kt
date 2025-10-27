@@ -1,5 +1,8 @@
 package com.example.vuvur
 
+// ✅ Import for serialization name
+import com.google.gson.annotations.SerializedName
+
 data class MediaFile(
     val id: Int,
     val path: String,
@@ -15,6 +18,14 @@ data class PaginatedFileResponse(
     val page: Int,
     val total_pages: Int,
     val items: List<MediaFile>
+)
+
+// ✅ Add data class for Group Info
+data class GroupInfo(
+    // Map JSON key "group_tag" to Kotlin field "groupTag"
+    @SerializedName("group_tag")
+    val groupTag: String,
+    val count: Int
 )
 
 data class ScanStatusResponse(
@@ -43,7 +54,9 @@ sealed interface GalleryUiState {
         val currentPage: Int = 1,
         val isLoadingNextPage: Boolean = false,
         val activeApiUrl: String,
-        // ✅ Add zoom level to the Success state
-        val zoomLevel: Float = 2.5f
+        val zoomLevel: Float = 2.5f,
+        // ✅ Add groups and selected group tag to Success state
+        val groups: List<GroupInfo> = emptyList(),
+        val selectedGroupTag: String? = null
     ) : GalleryUiState
 }

@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.vuvur.GalleryUiState
+import com.example.vuvur.GroupInfo // ✅ Import GroupInfo
 import com.example.vuvur.VuvurApplication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,6 +29,8 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
     private var pollingJob: Job? = null
     private var currentSort = "random"
     private var currentQuery = ""
+    // ✅ Add state for current group tag
+    private var currentGroupTag: String? = null
 
     init {
         viewModelScope.launch {
@@ -41,7 +44,6 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                 refresh()
             }
         }
-        // ✅ Listen for zoom level changes and update the state
         viewModelScope.launch {
             repository.zoomChanged.collect { newZoomLevel ->
                 _uiState.update { currentState ->
@@ -66,6 +68,12 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
         refresh()
     }
 
+    // ✅ Add function to apply group filter
+    fun applyGroupFilter(groupTag: String?) {
+        currentGroupTag = groupTag
+        refresh()
+    }
+
     fun deleteMediaItem(mediaId: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -86,14 +94,24 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
     fun loadPage(page: Int, isNewSearch: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
             val currentState = _uiState.value
+            // Prevent loading next page if already loading or no more pages
             if (currentState is GalleryUiState.Success && currentState.isLoadingNextPage) return@launch
-            if (currentState is GalleryUiState.Success && page > currentState.totalPages) return@launch
+            if (currentState is GalleryUiState.Success && !isNewSearch && page > currentState.totalPages) return@launch
 
             val activeApiUrl = repository.activeApiUrlFlow.first()
             val zoomLevel = repository.zoomLevelFlow.first()
+            var groups: List<GroupInfo> = (currentState as? GalleryUiState.Success)?.groups ?: emptyList()
 
             if (isNewSearch) {
                 _uiState.value = GalleryUiState.Loading(activeApiUrl)
+                // ✅ Fetch groups only on a new search/refresh
+                try {
+                    groups = apiService.getGroups()
+                } catch (e: Exception) {
+                    // Ignore group fetching errors for now, gallery might still work
+                    println("Failed to fetch groups: ${e.message}")
+                    groups = emptyList() // Ensure groups is empty on error
+                }
             } else if (currentState is GalleryUiState.Success) {
                 _uiState.value = currentState.copy(isLoadingNextPage = true)
             }
@@ -102,7 +120,9 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                 val response = apiService.getFiles(
                     sortBy = currentSort,
                     query = currentQuery,
-                    page = page
+                    page = page,
+                    // ✅ Pass the current group tag
+                    group = currentGroupTag
                 )
                 _uiState.update {
                     val currentFiles = if (isNewSearch || it !is GalleryUiState.Success) {
@@ -110,7 +130,8 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                     } else {
                         it.files
                     }
-                    val newItems = response.items.filter { newItem -> currentFiles.none { it.id == newItem.id } }
+                    // Prevent duplicates when loading next page
+                    val newItems = if (isNewSearch) response.items else response.items.filter { newItem -> currentFiles.none { it.id == newItem.id } }
 
                     GalleryUiState.Success(
                         files = currentFiles + newItems,
@@ -118,7 +139,10 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                         currentPage = response.page,
                         isLoadingNextPage = false,
                         activeApiUrl = activeApiUrl,
-                        zoomLevel = zoomLevel
+                        zoomLevel = zoomLevel,
+                        // ✅ Update state with groups and selected tag
+                        groups = groups,
+                        selectedGroupTag = currentGroupTag
                     )
                 }
             } catch (e: HttpException) {
@@ -153,19 +177,20 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val status = apiService.getScanStatus()
                     if (status.scan_complete) {
-                        refresh()
+                        refresh() // Refresh gallery after scan completes
                         break
                     } else {
                         _uiState.value = GalleryUiState.Scanning(status.progress, status.total)
                     }
                 } catch (e: Exception) {
-                    // continue polling
+                    // continue polling on error
                 }
             }
         }
     }
 
     fun refresh() {
+        pollingJob?.cancel() // Stop polling if a manual refresh is triggered
         loadPage(1, isNewSearch = true)
     }
 }
