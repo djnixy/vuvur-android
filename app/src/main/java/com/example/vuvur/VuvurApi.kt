@@ -17,13 +17,16 @@ interface VuvurApiService {
         @Query("sort") sortBy: String,
         @Query("q") query: String,
         @Query("page") page: Int,
-        // ✅ Add group parameter (nullable)
-        @Query("group") group: String?
+        @Query("group") group: String?,
+        @Query("subgroup") subgroup: String? // ✅ Add subgroup parameter (nullable)
     ): PaginatedFileResponse
 
-    // ✅ Add endpoint to get groups
     @GET("/api/gallery/groups")
     suspend fun getGroups(): List<GroupInfo>
+
+    // ✅ Add endpoint to get subgroups for a given group
+    @GET("/api/gallery/subgroups")
+    suspend fun getSubgroups(@Query("group") group: String): List<String> // Returns a list of subgroup names
 
     @GET("/api/scan/status")
     suspend fun getScanStatus(): ScanStatusResponse

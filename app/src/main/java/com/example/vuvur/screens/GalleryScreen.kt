@@ -15,8 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow // Keep for top-level groups
+import androidx.compose.foundation.lazy.items // Keep for LazyRow/LazyGrid
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed
@@ -29,6 +30,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown // Icon for dropdown
+import androidx.compose.material.icons.filled.KeyboardArrowUp // Icon for dropdown
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -40,10 +43,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton // Use OutlinedButton for dropdown anchor
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -59,6 +65,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow // For dropdown button text
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -66,15 +73,16 @@ import com.example.vuvur.GalleryUiState
 import com.example.vuvur.GroupInfo
 import com.example.vuvur.MediaFile
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class) // Keep OptIn
 @Composable
 fun GalleryScreen(
     viewModel: MediaViewModel,
     onImageClick: (Int) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
-    // Determine refreshing state based on Loading state *without* an initial API URL (meaning manual refresh)
     val isRefreshing = state is GalleryUiState.Loading && (state as GalleryUiState.Loading).apiUrl == null
+    val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = isRefreshing)
+
 
     var searchQuery by remember { mutableStateOf("") }
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -86,7 +94,11 @@ fun GalleryScreen(
     val focusManager = LocalFocusManager.current
     var showDeleteDialog by remember { mutableStateOf<Int?>(null) }
 
-    // Dialog for Delete Confirmation
+    // State for subgroup dropdown menu
+    var subgroupMenuExpanded by remember { mutableStateOf(false) }
+
+
+    // Dialog for Delete Confirmation (remains the same)
     if (showDeleteDialog != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = null },
@@ -111,7 +123,7 @@ fun GalleryScreen(
     }
 
     Column {
-        // Search and Sort Row
+        // Search and Sort Row (remains the same)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -165,61 +177,129 @@ fun GalleryScreen(
             }
         }
 
-        // Quick Access Buttons Row
-        // Only show groups row if state is Success and groups are not empty
-        if (state is GalleryUiState.Success && (state as GalleryUiState.Success).groups.isNotEmpty()) {
+        // Top-Level Group Buttons (LazyRow - remains the same)
+        if (state is GalleryUiState.Success) {
             val successState = state as GalleryUiState.Success
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // "All" Button
-                item {
-                    QuickAccessButton(
-                        text = "All",
-                        isSelected = successState.selectedGroupTag == null,
-                        onClick = { viewModel.applyGroupFilter(null) }
-                    )
+            if (successState.groups.isNotEmpty()) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        QuickAccessButton(
+                            text = "All",
+                            isSelected = successState.selectedGroupTag == null,
+                            onClick = {
+                                println("!!! Clicked 'All' button. Calling viewModel.applyGroupFilter(null)...")
+                                subgroupMenuExpanded = false // Close subgroup menu if open
+                                viewModel.applyGroupFilter(null)
+                            }
+                        )
+                    }
+                    items(successState.groups, key = { it.groupTag }) { group ->
+                        QuickAccessButton(
+                            text = "${group.groupTag} (${group.count})",
+                            isSelected = successState.selectedGroupTag == group.groupTag,
+                            onClick = {
+                                println("!!! Clicked group button: ${group.groupTag}. Calling viewModel.applyGroupFilter...")
+                                subgroupMenuExpanded = false // Close subgroup menu if open
+                                viewModel.applyGroupFilter(group.groupTag)
+                            }
+                        )
+                    }
                 }
-                // Group Buttons
-                items(successState.groups, key = { it.groupTag }) { group ->
-                    QuickAccessButton(
-                        text = "${group.groupTag} (${group.count})",
-                        isSelected = successState.selectedGroupTag == group.groupTag,
-                        onClick = { viewModel.applyGroupFilter(group.groupTag) }
-                    )
+            }
+
+            // ✅ Subgroup Dropdown Area (only show if a group is selected)
+            if (successState.selectedGroupTag != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.CenterStart // Align dropdown button to the start
+                ) {
+                    val buttonText = if (successState.isLoadingSubgroups) {
+                        "Loading Subfolders..."
+                    } else if (successState.selectedSubgroupTag != null) {
+                        successState.selectedSubgroupTag // Show selected subgroup
+                    } else {
+                        "All '${successState.selectedGroupTag}'" // Show "All [Group]"
+                    }
+                    val dropdownIcon = if (subgroupMenuExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown
+
+                    // Button to anchor and trigger the dropdown
+                    OutlinedButton(
+                        onClick = { if (!successState.isLoadingSubgroups) subgroupMenuExpanded = true },
+                        enabled = !successState.isLoadingSubgroups && successState.subgroups.isNotEmpty(), // Disable if loading or no subgroups
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth(0.6f) // Limit width of button
+                    ) {
+                        Text(
+                            text = buttonText,
+                            overflow = TextOverflow.Ellipsis, // Ellipsize if text too long
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f) // Allow text to take available space
+                        )
+                        Spacer(Modifier.width(8.dp)) // Space before icon
+                        Icon(dropdownIcon, contentDescription = "Select Subfolder")
+                    }
+
+                    // The Dropdown Menu itself
+                    DropdownMenu(
+                        expanded = subgroupMenuExpanded,
+                        onDismissRequest = { subgroupMenuExpanded = false }
+                        // Consider modifier = Modifier.width(IntrinsicSize.Max) if width is an issue
+                    ) {
+                        // "All [Group]" item
+                        DropdownMenuItem(
+                            text = { Text("All '${successState.selectedGroupTag}'") },
+                            onClick = {
+                                viewModel.applySubgroupFilter(null)
+                                subgroupMenuExpanded = false
+                            }
+                        )
+                        // Items for each subgroup
+                        successState.subgroups.forEach { subgroupName ->
+                            DropdownMenuItem(
+                                text = { Text(subgroupName) },
+                                onClick = {
+                                    viewModel.applySubgroupFilter(subgroupName)
+                                    subgroupMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        // PullToRefreshBox now wraps the main content area unconditionally
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
+
+        // Use Accompanist SwipeRefresh (remains the same)
+        SwipeRefresh(
+            state = swipeRefreshState,
             onRefresh = { viewModel.refresh() },
-            modifier = Modifier.fillMaxSize() // Make it fill remaining space
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Content Box within PullToRefresh - REMOVE verticalScroll
+            // Content Box within SwipeRefresh (remains the same)
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.fillMaxSize()
-                // Removed .verticalScroll(rememberScrollState())
             ) {
                 when (val currentState = state) {
                     is GalleryUiState.Success -> {
                         if (currentState.files.isEmpty()) {
-                            // Centered message within the Box, PTR should still work
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center, // Center vertically too
-                                modifier = Modifier.fillMaxSize().padding(16.dp) // Fill size for centering
+                                verticalArrangement = Arrangement.Center,
+                                modifier = Modifier.fillMaxSize().padding(16.dp)
+                                    .verticalScroll(rememberScrollState())
                             ) {
                                 Text("No media found.")
                                 Spacer(Modifier.height(8.dp))
                                 Text("(Pull down to refresh)")
                             }
                         } else {
-                            // Let the LazyVerticalStaggeredGrid handle its own scrolling
                             GalleryGrid(
                                 files = currentState.files,
                                 activeApiUrl = currentState.activeApiUrl,
@@ -237,11 +317,11 @@ fun GalleryScreen(
                         }
                     }
                     is GalleryUiState.Error -> {
-                        // Centered message within the Box, PTR should still work
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center, // Center vertically too
-                            modifier = Modifier.fillMaxSize().padding(16.dp) // Fill size for centering
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxSize().padding(16.dp)
+                                .verticalScroll(rememberScrollState())
                         ) {
                             Text("Failed to load: ${currentState.message}")
                             Spacer(Modifier.height(8.dp))
@@ -249,11 +329,11 @@ fun GalleryScreen(
                         }
                     }
                     is GalleryUiState.Scanning -> {
-                        // Centered message within the Box, PTR should still work
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center, // Center vertically too
-                            modifier = Modifier.fillMaxSize().padding(16.dp) // Fill size for centering
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxSize().padding(16.dp)
+                                .verticalScroll(rememberScrollState())
                         ) {
                             Text("Scanning Library...", style = MaterialTheme.typography.headlineSmall)
                             Spacer(Modifier.height(8.dp))
@@ -268,11 +348,9 @@ fun GalleryScreen(
                         }
                     }
                     is GalleryUiState.Loading -> {
-                        // Centered spinner within the Box
                         if (currentState.apiUrl != null) {
                             CircularProgressIndicator()
                         }
-                        // Manual refresh indicator is handled by PTR
                     }
                 }
             }
@@ -280,6 +358,7 @@ fun GalleryScreen(
     }
 }
 
+// QuickAccessButton Composable - No changes needed
 @Composable
 fun QuickAccessButton(
     text: String,
@@ -308,6 +387,7 @@ fun QuickAccessButton(
 }
 
 
+// GalleryGrid Composable - No changes needed
 @Composable
 fun GalleryGrid(
     files: List<MediaFile>,
@@ -318,15 +398,14 @@ fun GalleryGrid(
 ) {
     LazyVerticalStaggeredGrid(
         columns = StaggeredGridCells.Adaptive(150.dp),
-        modifier = Modifier.fillMaxSize(), // Add fillMaxSize here
+        modifier = Modifier.fillMaxSize(), // Grid fills its available space
         contentPadding = PaddingValues(4.dp),
         verticalItemSpacing = 4.dp,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         itemsIndexed(files, key = { _, file -> file.id }) { index, file ->
-            // Trigger load more when nearing the end (e.g., 10 items away)
             if (index >= files.size - 10) {
-                LaunchedEffect(Unit) { // Use Unit key to trigger only once when condition met
+                LaunchedEffect(Unit) {
                     onScrolledToEnd()
                 }
             }
@@ -341,6 +420,7 @@ fun GalleryGrid(
 }
 
 
+// MediaThumbnail Composable - No changes needed
 @Composable
 fun MediaThumbnail(
     file: MediaFile,
@@ -352,12 +432,12 @@ fun MediaThumbnail(
     val aspectRatio = if (file.height > 0 && file.width > 0) {
         file.width.toFloat() / file.height.toFloat()
     } else {
-        1.0f // Default aspect ratio if dimensions are invalid
+        1.0f
     }
 
     Box(
         modifier = Modifier
-            .fillMaxWidth() // Use fillMaxWidth for staggered grid items
+            .fillMaxWidth()
             .aspectRatio(aspectRatio)
             .clickable { onClick() }
     ) {
@@ -368,22 +448,21 @@ fun MediaThumbnail(
                 .build(),
             contentDescription = file.path,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop // Crop maintains aspect ratio better here
+            contentScale = ContentScale.Crop
         )
-        // Smaller delete button
         IconButton(
             onClick = onDeleteClick,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(4.dp) // Add some padding
-                .size(24.dp) // Make button smaller
-                .background(Color.Black.copy(alpha = 0.5f), shape = CircleShape) // Background for visibility
+                .padding(4.dp)
+                .size(24.dp)
+                .background(Color.Black.copy(alpha = 0.5f), shape = CircleShape)
         ) {
             Icon(
                 Icons.Default.Delete,
                 contentDescription = "Delete",
-                tint = Color.White, // White icon for contrast
-                modifier = Modifier.size(16.dp) // Make icon smaller
+                tint = Color.White,
+                modifier = Modifier.size(16.dp)
             )
         }
     }
