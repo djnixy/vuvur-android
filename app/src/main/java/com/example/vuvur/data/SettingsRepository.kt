@@ -39,8 +39,10 @@ class SettingsRepository(
 
     // Use a default list relevant to your setup or common defaults
     private val DEFAULT_API_LIST = listOf(
-        "http://10.0.2.2:5000" // Android emulator default localhost
-        // Add other defaults if needed
+        "http://100.97.27.128:5001",
+        "http://100.97.27.128:7752",
+        "http://100.78.149.91:5001",
+        "http://100.78.149.91:5002"
     )
 
     val activeApiUrlFlow: Flow<String> = dataStore.data.map { preferences ->
