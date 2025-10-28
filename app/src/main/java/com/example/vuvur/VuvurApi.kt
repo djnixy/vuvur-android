@@ -16,8 +16,14 @@ interface VuvurApiService {
     suspend fun getFiles(
         @Query("sort") sortBy: String,
         @Query("q") query: String,
-        @Query("page") page: Int
+        @Query("page") page: Int,
+        // ✅ Add group parameter (nullable)
+        @Query("group") group: String?
     ): PaginatedFileResponse
+
+    // ✅ Add endpoint to get groups
+    @GET("/api/gallery/groups")
+    suspend fun getGroups(): List<GroupInfo>
 
     @GET("/api/scan/status")
     suspend fun getScanStatus(): ScanStatusResponse
@@ -31,7 +37,6 @@ interface VuvurApiService {
     @POST("/api/cache/cleanup")
     suspend fun cleanCache(): CleanupResponse
 
-    // ✅ Add the delete endpoint
     @POST("/api/delete/{id}")
     suspend fun deleteMediaItem(@Path("id") mediaId: Int): DeleteResponse
 }
