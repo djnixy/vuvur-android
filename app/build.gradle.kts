@@ -65,6 +65,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3) // Main Material 3 library
+    implementation(libs.androidx.compose.adaptive)
+    implementation(libs.androidx.compose.adaptive.layout)
+    implementation(libs.androidx.compose.adaptive.navigation)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -84,9 +87,6 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.3.1")
     implementation("androidx.media3:media3-ui:1.3.1")
     implementation(libs.androidx.datastore.preferences)
-
-    // Use the correct Accompanist SwipeRefresh alias from your TOML file
-    implementation(libs.accompanist.swiperefresh)
 
     // Add the Coil GIF dependency explicitly
     implementation("io.coil-kt:coil-gif:2.6.0")
