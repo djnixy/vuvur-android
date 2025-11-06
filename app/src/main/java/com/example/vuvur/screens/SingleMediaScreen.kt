@@ -54,6 +54,7 @@ fun SingleMediaScreen(
                         MediaSlide(
                             file = currentFile,
                             activeApiUrl = currentState.activeApiUrl,
+                            activeApiKey = currentState.activeApiKey,
                             onNextImage = { currentIndex++ },
                             onPreviousImage = { currentIndex-- },
                             allowSwipeNavigation = false, // disables vertical swipe

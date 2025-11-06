@@ -18,15 +18,14 @@ interface VuvurApiService {
         @Query("q") query: String,
         @Query("page") page: Int,
         @Query("group") group: String?,
-        @Query("subgroup") subgroup: String? // ✅ Add subgroup parameter (nullable)
+        @Query("subgroup") subgroup: String?
     ): PaginatedFileResponse
 
     @GET("/api/gallery/groups")
     suspend fun getGroups(): List<GroupInfo>
 
-    // ✅ Add endpoint to get subgroups for a given group
     @GET("/api/gallery/subgroups")
-    suspend fun getSubgroups(@Query("group") group: String): List<String> // Returns a list of subgroup names
+    suspend fun getSubgroups(@Query("group") group: String): List<String>
 
     @GET("/api/scan/status")
     suspend fun getScanStatus(): ScanStatusResponse
@@ -50,10 +49,12 @@ class ApiClient(private val repository: SettingsRepository) {
         private const val DUMMY_URL = "http://localhost/"
     }
 
-    fun createService(baseUrl: String): VuvurApiService {
+    // ✅ Make sure this function signature accepts two arguments
+    fun createService(baseUrl: String, apiKey: String?): VuvurApiService {
         val interceptor = Interceptor { chain ->
             val newUrl = baseUrl.toHttpUrl()
-            val request = chain.request().newBuilder()
+
+            val requestBuilder = chain.request().newBuilder()
                 .url(
                     chain.request().url.newBuilder()
                         .scheme(newUrl.scheme)
@@ -61,9 +62,13 @@ class ApiClient(private val repository: SettingsRepository) {
                         .port(newUrl.port)
                         .build()
                 )
-                .build()
 
-            chain.proceed(request)
+            // ✅ Conditionally add the header
+            apiKey?.let {
+                requestBuilder.header("X-Api-Key", it)
+            }
+
+            chain.proceed(requestBuilder.build())
         }
 
         val client = OkHttpClient.Builder()

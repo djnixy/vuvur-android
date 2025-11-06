@@ -51,6 +51,8 @@ sealed interface GalleryUiState {
         val currentPage: Int = 1,
         val isLoadingNextPage: Boolean = false,
         val activeApiUrl: String,
+        // ✅ Add the API key to the success state
+        val activeApiKey: String?,
         val zoomLevel: Float = 2.5f,
         val groups: List<GroupInfo> = emptyList(),
         val selectedGroupTag: String? = null,

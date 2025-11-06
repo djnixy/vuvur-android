@@ -46,7 +46,10 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             repository.apiChanged.collectLatest { newApiUrl ->
-                apiService = app.apiClient.createService(newApiUrl)
+                // ✅ Get the key for the new URL
+                val newApiKey = repository.getApiKeyForUrl(newApiUrl)
+                // ✅ Pass both to createService
+                apiService = app.apiClient.createService(newApiUrl, newApiKey)
                 refresh()
             }
         }
@@ -240,6 +243,7 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val activeApiUrl = repository.activeApiUrlFlow.first()
+            val activeApiKey = repository.getApiKeyForUrl(activeApiUrl)
             val zoomLevel = repository.zoomLevelFlow.first()
             val previousSuccessState = currentStateValue as? GalleryUiState.Success
             var groups: List<GroupInfo> = previousSuccessState?.groups ?: emptyList()
@@ -312,6 +316,7 @@ class MediaViewModel(application: Application) : AndroidViewModel(application) {
                         currentPage = response.page,
                         isLoadingNextPage = false,
                         activeApiUrl = activeApiUrl,
+                        activeApiKey = activeApiKey,
                         zoomLevel = zoomLevel,
                         groups = groups,
                         selectedGroupTag = currentGroupTag,

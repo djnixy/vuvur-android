@@ -9,7 +9,11 @@ import com.example.vuvur.data.dataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first // ✅ Import 'first'
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking // ✅ Import 'runBlocking'
+import okhttp3.Interceptor // ✅ Import 'Interceptor'
+import okhttp3.OkHttpClient // ✅ Import 'OkHttpClient'
 
 // Define the CoroutineScope at the application level
 private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -31,16 +35,43 @@ class VuvurApplication : Application(), ImageLoaderFactory {
         applicationScope.launch {
             // Fetch initial URL using the suspend function from the initialized repository
             val activeUrl = settingsRepository.getActiveApiUrl()
-            vuvurApiService = apiClient.createService(activeUrl)
+            // Get the corresponding API key
+            val activeApiKey = settingsRepository.getApiKeyForUrl(activeUrl)
+            // Pass both to the createService method
+            vuvurApiService = apiClient.createService(activeUrl, activeApiKey)
         }
     }
 
     // Override newImageLoader to provide a custom instance
     override fun newImageLoader(): ImageLoader {
+        // ✅ Create a custom OkHttpClient for Coil
+        val coilOkHttpClient = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                // This interceptor will run for every image request
+
+                // ✅ Use runBlocking to synchronously get the current URL and Key
+                // This is safe because Coil runs this on a background thread.
+                val (activeUrl, apiKey) = runBlocking(Dispatchers.IO) {
+                    val url = settingsRepository.activeApiUrlFlow.first()
+                    val key = settingsRepository.getApiKeyForUrl(url)
+                    url to key
+                }
+
+                // ✅ Build the new request, adding the API key if it exists
+                val newRequest = chain.request().newBuilder().apply {
+                    apiKey?.let {
+                        header("X-Api-Key", it)
+                    }
+                }.build()
+
+                chain.proceed(newRequest)
+            }
+            .build()
+
         return ImageLoader.Builder(this)
+            // ✅ Tell Coil to use our custom OkHttpClient
+            .okHttpClient(coilOkHttpClient)
             .components {
-                // ✅ Remove the SDK_INT check, always use ImageDecoderDecoder
-                // Since minSdk is 33, SDK_INT will always be >= 28.
                 add(ImageDecoderDecoder.Factory())
             }
             .crossfade(true) // Optional: for smooth image loading
