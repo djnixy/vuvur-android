@@ -63,6 +63,7 @@ fun RandomScreen(
                     MediaSlide(
                         file = file,
                         activeApiUrl = currentState.activeApiUrl,
+                        activeApiKey = currentState.activeApiKey,
                         onNextImage = { /* go to next media */ },
                         onPreviousImage = { /* go to previous media */ },
                         allowSwipeNavigation = true, // enables vertical swipe

@@ -76,6 +76,7 @@ fun ViewerScreen(
                         MediaSlide(
                             file = file,
                             activeApiUrl = currentState.activeApiUrl,
+                            activeApiKey = currentState.activeApiKey,
                             onNextImage = { /* logic to go to next image */ },
                             onPreviousImage = { /* logic to go to previous image */ },
                             allowSwipeNavigation = true,

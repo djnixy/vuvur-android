@@ -45,6 +45,14 @@ class SettingsRepository(
         "http://100.78.149.91:5002"
     )
 
+    // ✅ Map of default API URLs to their respective keys
+    private val DEFAULT_API_KEYS = mapOf(
+        "http://100.97.27.128:5001" to "vuvur_dev",
+        "http://100.97.27.128:7752" to "vuvur_prod",
+        "http://100.78.149.91:5001" to "vuvur_dev",
+        "http://100.78.149.91:5002" to "vuvur_prod"
+    )
+
     val activeApiUrlFlow: Flow<String> = dataStore.data.map { preferences ->
         preferences[PreferencesKeys.ACTIVE_API_URL] ?: DEFAULT_API_LIST.first()
     }
@@ -70,6 +78,13 @@ class SettingsRepository(
     // Used by VuvurApplication during initialization
     suspend fun getActiveApiUrl(): String {
         return activeApiUrlFlow.first() // Get the first value from the flow
+    }
+
+    // ✅ Public function to get the API key for a given URL
+    suspend fun getApiKeyForUrl(url: String): String? {
+        // In the future, this could check saved preferences.
+        // For now, it only checks the hardcoded default map.
+        return DEFAULT_API_KEYS[url]
     }
 
     suspend fun saveApiUrl(url: String) {

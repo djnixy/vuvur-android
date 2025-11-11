@@ -48,7 +48,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
         viewModelScope.launch {
             repository.apiChanged.collectLatest { newApiUrl ->
-                apiService = app.apiClient.createService(newApiUrl)
+                // ✅ Get the key for the new URL
+                val newApiKey = repository.getApiKeyForUrl(newApiUrl)
+                // ✅ Pass both to createService
+                apiService = app.apiClient.createService(newApiUrl, newApiKey)
             }
         }
     }

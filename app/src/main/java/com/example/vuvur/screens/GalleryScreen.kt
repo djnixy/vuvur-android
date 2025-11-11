@@ -33,6 +33,9 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown // Icon for dropdown
 import androidx.compose.material.icons.filled.KeyboardArrowUp // Icon for dropdown
 import androidx.compose.material.icons.filled.Search
+// ✅ Use the correct M3 imports
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -47,8 +50,6 @@ import androidx.compose.material3.OutlinedButton // Use OutlinedButton for dropd
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import com.google.accompanist.swiperefresh.SwipeRefresh
-import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -80,9 +81,9 @@ fun GalleryScreen(
     onImageClick: (Int) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    // Use the simpler 'is refreshing' check
     val isRefreshing = state is GalleryUiState.Loading && (state as GalleryUiState.Loading).apiUrl == null
-    val swipeRefreshState = rememberSwipeRefreshState(isRefreshing = isRefreshing)
-
+    val pullRefreshState = rememberPullToRefreshState()
 
     var searchQuery by remember { mutableStateOf("") }
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -96,7 +97,6 @@ fun GalleryScreen(
 
     // State for subgroup dropdown menu
     var subgroupMenuExpanded by remember { mutableStateOf(false) }
-
 
     // Dialog for Delete Confirmation (remains the same)
     if (showDeleteDialog != null) {
@@ -122,169 +122,172 @@ fun GalleryScreen(
         )
     }
 
-    Column {
-        // Search and Sort Row (remains the same)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    label = { Text("Search using tags") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    leadingIcon = {
-                        IconButton(onClick = {
-                            viewModel.applySearch(searchQuery)
-                            focusManager.clearFocus()
-                        }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search by tags")
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(
-                        onSearch = {
-                            viewModel.applySearch(searchQuery)
-                            focusManager.clearFocus()
-                        }
+    // ✅ This is the PullToRefreshBox you started
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = { viewModel.refresh() },
+        modifier = Modifier.fillMaxSize(),
+        state = pullRefreshState
+    ) {
+        // ✅ The rest of the screen content goes inside a Column here
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Search and Sort Row (remains the same)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        label = { Text("Search using tags") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        leadingIcon = {
+                            IconButton(onClick = {
+                                viewModel.applySearch(searchQuery)
+                                focusManager.clearFocus()
+                            }) {
+                                Icon(Icons.Default.Search, contentDescription = "Search by tags")
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(
+                            onSearch = {
+                                viewModel.applySearch(searchQuery)
+                                focusManager.clearFocus()
+                            }
+                        )
                     )
-                )
 
-                IconButton(onClick = { sortMenuExpanded = true }) {
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = "Sort Options")
-                }
-            }
-
-            // Dropdown Menu for Sorting (aligned to the end)
-            Box(modifier = Modifier.align(Alignment.TopEnd)) {
-                DropdownMenu(
-                    expanded = sortMenuExpanded,
-                    onDismissRequest = { sortMenuExpanded = false }
-                ) {
-                    sortOptions.forEach { (key, value) ->
-                        DropdownMenuItem(
-                            text = { Text(value) },
-                            onClick = {
-                                viewModel.applySort(key)
-                                sortMenuExpanded = false
-                            }
-                        )
+                    IconButton(onClick = { sortMenuExpanded = true }) {
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = "Sort Options")
                     }
                 }
-            }
-        }
 
-        // Top-Level Group Buttons (LazyRow - remains the same)
-        if (state is GalleryUiState.Success) {
-            val successState = state as GalleryUiState.Success
-            if (successState.groups.isNotEmpty()) {
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    item {
-                        QuickAccessButton(
-                            text = "All",
-                            isSelected = successState.selectedGroupTag == null,
-                            onClick = {
-                                println("!!! Clicked 'All' button. Calling viewModel.applyGroupFilter(null)...")
-                                subgroupMenuExpanded = false // Close subgroup menu if open
-                                viewModel.applyGroupFilter(null)
-                            }
-                        )
-                    }
-                    items(successState.groups, key = { it.groupTag }) { group ->
-                        QuickAccessButton(
-                            text = "${group.groupTag} (${group.count})",
-                            isSelected = successState.selectedGroupTag == group.groupTag,
-                            onClick = {
-                                println("!!! Clicked group button: ${group.groupTag}. Calling viewModel.applyGroupFilter...")
-                                subgroupMenuExpanded = false // Close subgroup menu if open
-                                viewModel.applyGroupFilter(group.groupTag)
-                            }
-                        )
-                    }
-                }
-            }
-
-            // ✅ Subgroup Dropdown Area (only show if a group is selected)
-            if (successState.selectedGroupTag != null) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.CenterStart // Align dropdown button to the start
-                ) {
-                    val buttonText = if (successState.isLoadingSubgroups) {
-                        "Loading Subfolders..."
-                    } else if (successState.selectedSubgroupTag != null) {
-                        successState.selectedSubgroupTag // Show selected subgroup
-                    } else {
-                        "All '${successState.selectedGroupTag}'" // Show "All [Group]"
-                    }
-                    val dropdownIcon = if (subgroupMenuExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown
-
-                    // Button to anchor and trigger the dropdown
-                    OutlinedButton(
-                        onClick = { if (!successState.isLoadingSubgroups) subgroupMenuExpanded = true },
-                        enabled = !successState.isLoadingSubgroups && successState.subgroups.isNotEmpty(), // Disable if loading or no subgroups
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        modifier = Modifier.fillMaxWidth(0.6f) // Limit width of button
-                    ) {
-                        Text(
-                            text = buttonText,
-                            overflow = TextOverflow.Ellipsis, // Ellipsize if text too long
-                            maxLines = 1,
-                            modifier = Modifier.weight(1f) // Allow text to take available space
-                        )
-                        Spacer(Modifier.width(8.dp)) // Space before icon
-                        Icon(dropdownIcon, contentDescription = "Select Subfolder")
-                    }
-
-                    // The Dropdown Menu itself
+                // Dropdown Menu for Sorting (aligned to the end)
+                Box(modifier = Modifier.align(Alignment.TopEnd)) {
                     DropdownMenu(
-                        expanded = subgroupMenuExpanded,
-                        onDismissRequest = { subgroupMenuExpanded = false }
-                        // Consider modifier = Modifier.width(IntrinsicSize.Max) if width is an issue
+                        expanded = sortMenuExpanded,
+                        onDismissRequest = { sortMenuExpanded = false }
                     ) {
-                        // "All [Group]" item
-                        DropdownMenuItem(
-                            text = { Text("All '${successState.selectedGroupTag}'") },
-                            onClick = {
-                                viewModel.applySubgroupFilter(null)
-                                subgroupMenuExpanded = false
-                            }
-                        )
-                        // Items for each subgroup
-                        successState.subgroups.forEach { subgroupName ->
+                        sortOptions.forEach { (key, value) ->
                             DropdownMenuItem(
-                                text = { Text(subgroupName) },
+                                text = { Text(value) },
                                 onClick = {
-                                    viewModel.applySubgroupFilter(subgroupName)
-                                    subgroupMenuExpanded = false
+                                    viewModel.applySort(key)
+                                    sortMenuExpanded = false
                                 }
                             )
                         }
                     }
                 }
             }
-        }
+
+            // Top-Level Group Buttons (LazyRow - remains the same)
+            if (state is GalleryUiState.Success) {
+                val successState = state as GalleryUiState.Success
+                if (successState.groups.isNotEmpty()) {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
+                            QuickAccessButton(
+                                text = "All",
+                                isSelected = successState.selectedGroupTag == null,
+                                onClick = {
+                                    println("!!! Clicked 'All' button. Calling viewModel.applyGroupFilter(null)...")
+                                    subgroupMenuExpanded = false // Close subgroup menu if open
+                                    viewModel.applyGroupFilter(null)
+                                }
+                            )
+                        }
+                        items(successState.groups, key = { it.groupTag }) { group ->
+                            QuickAccessButton(
+                                text = "${group.groupTag} (${group.count})",
+                                isSelected = successState.selectedGroupTag == group.groupTag,
+                                onClick = {
+                                    println("!!! Clicked group button: ${group.groupTag}. Calling viewModel.applyGroupFilter...")
+                                    subgroupMenuExpanded = false // Close subgroup menu if open
+                                    viewModel.applyGroupFilter(group.groupTag)
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Subgroup Dropdown Area (only show if a group is selected)
+                if (successState.selectedGroupTag != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.CenterStart // Align dropdown button to the start
+                    ) {
+                        val buttonText = if (successState.isLoadingSubgroups) {
+                            "Loading Subfolders..."
+                        } else if (successState.selectedSubgroupTag != null) {
+                            successState.selectedSubgroupTag // Show selected subgroup
+                        } else {
+                            "All '${successState.selectedGroupTag}'" // Show "All [Group]"
+                        }
+                        val dropdownIcon = if (subgroupMenuExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown
+
+                        // Button to anchor and trigger the dropdown
+                        OutlinedButton(
+                            onClick = { if (!successState.isLoadingSubgroups) subgroupMenuExpanded = true },
+                            enabled = !successState.isLoadingSubgroups && successState.subgroups.isNotEmpty(), // Disable if loading or no subgroups
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier.fillMaxWidth(0.6f) // Limit width of button
+                        ) {
+                            Text(
+                                text = buttonText,
+                                overflow = TextOverflow.Ellipsis, // Ellipsize if text too long
+                                maxLines = 1,
+                                modifier = Modifier.weight(1f) // Allow text to take available space
+                            )
+                            Spacer(Modifier.width(8.dp)) // Space before icon
+                            Icon(dropdownIcon, contentDescription = "Select Subfolder")
+                        }
+
+                        // The Dropdown Menu itself
+                        DropdownMenu(
+                            expanded = subgroupMenuExpanded,
+                            onDismissRequest = { subgroupMenuExpanded = false }
+                        ) {
+                            // "All [Group]" item
+                            DropdownMenuItem(
+                                text = { Text("All '${successState.selectedGroupTag}'") },
+                                onClick = {
+                                    viewModel.applySubgroupFilter(null)
+                                    subgroupMenuExpanded = false
+                                }
+                            )
+                            // Items for each subgroup
+                            successState.subgroups.forEach { subgroupName ->
+                                DropdownMenuItem(
+                                    text = { Text(subgroupName) },
+                                    onClick = {
+                                        viewModel.applySubgroupFilter(subgroupName)
+                                        subgroupMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
 
-        // Use Accompanist SwipeRefresh (remains the same)
-        SwipeRefresh(
-            state = swipeRefreshState,
-            onRefresh = { viewModel.refresh() },
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Content Box within SwipeRefresh (remains the same)
+            // This Box handles the main content (grid, loading, errors)
             Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f), // Allow this Box to take remaining space
+                contentAlignment = Alignment.Center
             ) {
                 when (val currentState = state) {
                     is GalleryUiState.Success -> {
@@ -303,6 +306,7 @@ fun GalleryScreen(
                             GalleryGrid(
                                 files = currentState.files,
                                 activeApiUrl = currentState.activeApiUrl,
+                                activeApiKey = currentState.activeApiKey, // Pass key
                                 onScrolledToEnd = {
                                     if (!currentState.isLoadingNextPage && currentState.currentPage < currentState.totalPages) {
                                         viewModel.loadPage(currentState.currentPage + 1)
@@ -348,6 +352,7 @@ fun GalleryScreen(
                         }
                     }
                     is GalleryUiState.Loading -> {
+                        // Show a loading indicator *unless* it's a pull-to-refresh
                         if (currentState.apiUrl != null) {
                             CircularProgressIndicator()
                         }
@@ -387,11 +392,12 @@ fun QuickAccessButton(
 }
 
 
-// GalleryGrid Composable - No changes needed
+// GalleryGrid Composable
 @Composable
 fun GalleryGrid(
     files: List<MediaFile>,
     activeApiUrl: String,
+    activeApiKey: String?, // Accept key
     onScrolledToEnd: () -> Unit,
     onImageClick: (Int) -> Unit,
     onDeleteClick: (Int) -> Unit
@@ -412,6 +418,7 @@ fun GalleryGrid(
             MediaThumbnail(
                 file = file,
                 activeApiUrl = activeApiUrl,
+                activeApiKey = activeApiKey, // Pass key
                 onClick = { onImageClick(index) },
                 onDeleteClick = { onDeleteClick(file.id) }
             )
@@ -425,6 +432,7 @@ fun GalleryGrid(
 fun MediaThumbnail(
     file: MediaFile,
     activeApiUrl: String,
+    activeApiKey: String?,
     onClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
@@ -444,6 +452,11 @@ fun MediaThumbnail(
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(thumbnailUrl)
+                .apply {
+                    activeApiKey?.let {
+                        addHeader("X-Api-Key", it)
+                    }
+                }
                 .crossfade(true)
                 .build(),
             contentDescription = file.path,

@@ -15,7 +15,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultHttpDataSource // ✅ Import
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory // ✅ Import
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -25,6 +27,8 @@ import com.example.vuvur.MediaFile
 fun MediaSlide(
     file: MediaFile,
     activeApiUrl: String,
+    // ✅ Accept the API key
+    activeApiKey: String?,
     onNextImage: () -> Unit,
     onPreviousImage: () -> Unit,
     allowSwipeNavigation: Boolean = true,
@@ -125,19 +129,42 @@ fun MediaSlide(
                     contentScale = ContentScale.Fit
                 )
             } else {
-                val exoPlayer = remember {
-                    ExoPlayer.Builder(context).build().apply {
-                        val mediaItem =
-                            MediaItem.fromUri("$activeApiUrl/api/stream/${file.id}")
-                        setMediaItem(mediaItem)
-                        repeatMode = Player.REPEAT_MODE_ONE
-                        prepare()
-                        playWhenReady = true
+                // ✅ This is the new, more robust ExoPlayer block
+                val exoPlayer = remember(file, activeApiKey) {
+
+                    // 1. Create an HTTP data source factory
+                    val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+
+                    // 2. Conditionally set the API key in the default headers
+                    if (activeApiKey != null) {
+                        httpDataSourceFactory.setDefaultRequestProperties(
+                            mapOf("X-Api-Key" to activeApiKey)
+                        )
                     }
+
+                    // 3. Create a MediaSourceFactory from the HTTP factory
+                    val mediaSourceFactory = DefaultMediaSourceFactory(httpDataSourceFactory)
+
+                    // 4. Build ExoPlayer, setting the MediaSourceFactory
+                    ExoPlayer.Builder(context)
+                        .setMediaSourceFactory(mediaSourceFactory) // <-- This is the key change
+                        .build()
+                        .apply {
+                            // 5. The MediaItem is now just a simple URI
+                            val mediaItem = MediaItem.fromUri("$activeApiUrl/api/stream/${file.id}")
+
+                            // Configure and prepare the player
+                            setMediaItem(mediaItem)
+                            repeatMode = Player.REPEAT_MODE_ONE
+                            prepare()
+                            playWhenReady = true
+                        }
                 }
+
                 DisposableEffect(Unit) {
                     onDispose { exoPlayer.release() }
                 }
+
                 AndroidView(
                     factory = {
                         PlayerView(it).apply {
